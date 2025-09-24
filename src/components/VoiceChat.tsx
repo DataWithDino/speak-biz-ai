@@ -21,7 +21,8 @@ const skillLevelInstructions = {
 
 const VoiceChat: React.FC<VoiceChatProps> = ({ topic, persona, skillLevel }) => {
   const { toast } = useToast();
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   const levelInstruction = skillLevelInstructions[skillLevel as keyof typeof skillLevelInstructions] || skillLevelInstructions.B1;
   
@@ -56,15 +57,15 @@ Remember to match the learner's level - don't use language that's too advanced o
     },
     onConnect: () => {
       console.log('Connected to ElevenLabs');
-      setIsConnected(true);
       toast({
         title: "Connected",
-        description: "Voice chat is ready",
+        description: "Voice chat is ready. Start speaking!",
       });
     },
     onDisconnect: () => {
       console.log('Disconnected from ElevenLabs');
-      setIsConnected(false);
+      setConversationId(null);
+      setIsConnecting(false);
       toast({
         title: "Disconnected",
         description: "Voice chat ended",
@@ -75,18 +76,31 @@ Remember to match the learner's level - don't use language that's too advanced o
     },
     onError: (error) => {
       console.error('Conversation error:', error);
+      setIsConnecting(false);
+      setConversationId(null);
+      const errorMessage = typeof error === 'string' ? error : 
+                          (error && typeof error === 'object' && 'message' in error) ? 
+                          (error as any).message : "Failed to maintain voice connection";
       toast({
         title: "Error",
-        description: "Failed to connect to voice service",
+        description: errorMessage,
         variant: "destructive",
       });
     },
   });
 
   const startConversation = async () => {
+    if (isConnecting || conversationId) {
+      console.log('Already connecting or connected');
+      return;
+    }
+
+    setIsConnecting(true);
+    
     try {
-      // Request microphone permission
+      // Request microphone permission first
       await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('Microphone permission granted');
 
       // Get signed URL from our edge function
       const { data, error } = await supabase.functions.invoke('elevenlabs-agent', {
@@ -97,17 +111,22 @@ Remember to match the learner's level - don't use language that's too advanced o
         throw new Error(error?.message || 'Failed to get conversation URL');
       }
 
+      console.log('Got signed URL, starting session...');
+
       // Connect to the ElevenLabs agent using the signed URL
-      const conversationId = await conversation.startSession({
+      const sessionId = await conversation.startSession({
         signedUrl: data.signedUrl
       });
       
-      console.log('Started conversation with ID:', conversationId);
+      console.log('Started conversation with ID:', sessionId);
+      setConversationId(sessionId);
+      setIsConnecting(false);
     } catch (error) {
       console.error('Error starting conversation:', error);
+      setIsConnecting(false);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to start conversation. Make sure your agent is properly configured.',
+        title: "Connection Error",
+        description: error instanceof Error ? error.message : 'Failed to start conversation. Please try again.',
         variant: "destructive",
       });
     }
@@ -115,19 +134,27 @@ Remember to match the learner's level - don't use language that's too advanced o
 
   const endConversation = async () => {
     try {
+      console.log('Ending conversation...');
       await conversation.endSession();
+      setConversationId(null);
     } catch (error) {
       console.error('Error ending conversation:', error);
+      setConversationId(null);
     }
   };
 
   useEffect(() => {
+    // Cleanup on unmount
     return () => {
-      if (conversation.status === 'connected') {
-        conversation.endSession();
+      if (conversationId && conversation.status === 'connected') {
+        console.log('Component unmounting, ending session...');
+        conversation.endSession().catch(console.error);
       }
     };
-  }, [conversation]);
+  }, [conversationId, conversation]);
+
+  // Check if connected based on conversation status
+  const isConnected = conversation.status === 'connected' && conversationId !== null;
 
   return (
     <div className="flex-1 flex items-center justify-center px-4">
@@ -151,17 +178,23 @@ Remember to match the learner's level - don't use language that's too advanced o
           {/* Core bubble - clickable */}
           <button
             onClick={isConnected ? endConversation : startConversation}
+            disabled={isConnecting}
             className={`relative w-48 h-48 rounded-full bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center transition-all duration-300 hover:scale-105 ${
               conversation.isSpeaking ? 'scale-110 shadow-2xl shadow-primary/50' : 'scale-100 shadow-xl shadow-primary/30'
-            }`}
+            } ${isConnecting ? 'opacity-75 cursor-wait' : ''}`}
           >
             {/* Inner glow */}
             <div className="absolute inset-4 rounded-full bg-gradient-to-tr from-white/20 to-transparent blur-md" />
             
             {/* Icon */}
             <div className="relative z-10">
-              {!isConnected ? (
+              {!isConnected && !isConnecting ? (
                 <MicOff className="w-16 h-16 text-white" />
+              ) : isConnecting ? (
+                <div className="flex flex-col items-center">
+                  <Mic className="w-16 h-16 text-white animate-pulse" />
+                  <span className="text-xs text-white/80 mt-2">Connecting...</span>
+                </div>
               ) : conversation.isSpeaking ? (
                 <Headphones className="w-16 h-16 text-white animate-pulse" />
               ) : (
@@ -182,7 +215,8 @@ Remember to match the learner's level - don't use language that's too advanced o
         {/* Status text */}
         <div className="absolute -bottom-12 left-1/2 transform -translate-x-1/2 text-center">
           <p className="text-sm font-medium text-muted-foreground">
-            {!isConnected ? 'Click to start voice chat' : 
+            {isConnecting ? 'Connecting to voice chat...' :
+             !isConnected ? 'Click to start voice chat' : 
              conversation.isSpeaking ? `${persona} is speaking...` : 
              'Listening...'}
           </p>
