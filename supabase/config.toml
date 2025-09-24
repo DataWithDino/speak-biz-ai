@@ -1,1 +1,4 @@
 project_id = "mybwxaszvtwiwtxigibw"
+
+[functions.conversation]
+verify_jwt = true
