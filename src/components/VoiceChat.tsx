@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useConversation } from '@11labs/react';
 import { Mic, Headphones, MicOff } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -22,7 +22,9 @@ const skillLevelInstructions = {
 const VoiceChat: React.FC<VoiceChatProps> = ({ topic, persona, skillLevel }) => {
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [sessionActive, setSessionActive] = useState(false);
+  const sessionIdRef = useRef<string | null>(null);
+  const isUnmountingRef = useRef(false);
 
   const levelInstruction = skillLevelInstructions[skillLevel as keyof typeof skillLevelInstructions] || skillLevelInstructions.B1;
   
@@ -56,53 +58,68 @@ Remember to match the learner's level - don't use language that's too advanced o
       }
     },
     onConnect: () => {
-      console.log('Connected to ElevenLabs');
-      toast({
-        title: "Connected",
-        description: "Voice chat is ready. Start speaking!",
-      });
+      console.log('WebSocket connected to ElevenLabs');
+      if (!isUnmountingRef.current) {
+        setSessionActive(true);
+        toast({
+          title: "Connected",
+          description: "Voice chat is ready. Start speaking!",
+        });
+      }
     },
     onDisconnect: () => {
-      console.log('Disconnected from ElevenLabs');
-      setConversationId(null);
-      setIsConnecting(false);
-      toast({
-        title: "Disconnected",
-        description: "Voice chat ended",
-      });
+      console.log('WebSocket disconnected from ElevenLabs');
+      if (!isUnmountingRef.current) {
+        setSessionActive(false);
+        sessionIdRef.current = null;
+        toast({
+          title: "Disconnected",
+          description: "Voice chat ended",
+        });
+      }
     },
     onMessage: (message) => {
-      console.log('Received message:', message);
+      console.log('Received message from ElevenLabs:', message);
     },
     onError: (error) => {
-      console.error('Conversation error:', error);
-      setIsConnecting(false);
-      setConversationId(null);
-      const errorMessage = typeof error === 'string' ? error : 
-                          (error && typeof error === 'object' && 'message' in error) ? 
-                          (error as any).message : "Failed to maintain voice connection";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      console.error('ElevenLabs conversation error:', error);
+      if (!isUnmountingRef.current) {
+        setIsConnecting(false);
+        setSessionActive(false);
+        sessionIdRef.current = null;
+        const errorMessage = typeof error === 'string' ? error : 
+                            (error && typeof error === 'object' && 'message' in error) ? 
+                            (error as any).message : "Failed to maintain voice connection";
+        toast({
+          title: "Connection Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     },
   });
 
   const startConversation = async () => {
-    if (isConnecting || conversationId) {
-      console.log('Already connecting or connected');
+    if (isConnecting || sessionActive || sessionIdRef.current) {
+      console.log('Already connecting or connected', { isConnecting, sessionActive, sessionId: sessionIdRef.current });
       return;
     }
 
+    console.log('Starting new conversation...');
     setIsConnecting(true);
     
     try {
       // Request microphone permission first
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       console.log('Microphone permission granted');
+      
+      // Keep the stream active
+      stream.getTracks().forEach(track => {
+        console.log('Audio track:', track.label, 'enabled:', track.enabled);
+      });
 
       // Get signed URL from our edge function
+      console.log('Fetching signed URL from edge function...');
       const { data, error } = await supabase.functions.invoke('elevenlabs-agent', {
         body: { topic, persona, skillLevel }
       });
@@ -111,50 +128,73 @@ Remember to match the learner's level - don't use language that's too advanced o
         throw new Error(error?.message || 'Failed to get conversation URL');
       }
 
-      console.log('Got signed URL, starting session...');
+      console.log('Got signed URL, starting ElevenLabs session...');
 
       // Connect to the ElevenLabs agent using the signed URL
       const sessionId = await conversation.startSession({
         signedUrl: data.signedUrl
       });
       
-      console.log('Started conversation with ID:', sessionId);
-      setConversationId(sessionId);
+      console.log('ElevenLabs session started with ID:', sessionId);
+      sessionIdRef.current = sessionId;
       setIsConnecting(false);
+      
+      // Keep the microphone stream active
+      // Don't stop the tracks as ElevenLabs needs them
+      
     } catch (error) {
       console.error('Error starting conversation:', error);
       setIsConnecting(false);
+      setSessionActive(false);
+      sessionIdRef.current = null;
+      
+      let errorMessage = 'Failed to start conversation';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        if (error.message.includes('microphone')) {
+          errorMessage = 'Microphone access is required for voice chat';
+        }
+      }
+      
       toast({
-        title: "Connection Error",
-        description: error instanceof Error ? error.message : 'Failed to start conversation. Please try again.',
+        title: "Connection Failed",
+        description: errorMessage,
         variant: "destructive",
       });
     }
   };
 
   const endConversation = async () => {
+    if (!sessionIdRef.current && !sessionActive) {
+      console.log('No active session to end');
+      return;
+    }
+    
     try {
-      console.log('Ending conversation...');
+      console.log('Ending conversation session:', sessionIdRef.current);
       await conversation.endSession();
-      setConversationId(null);
+      sessionIdRef.current = null;
+      setSessionActive(false);
     } catch (error) {
       console.error('Error ending conversation:', error);
-      setConversationId(null);
+      sessionIdRef.current = null;
+      setSessionActive(false);
     }
   };
 
   useEffect(() => {
     // Cleanup on unmount
     return () => {
-      if (conversationId && conversation.status === 'connected') {
-        console.log('Component unmounting, ending session...');
+      isUnmountingRef.current = true;
+      if (sessionIdRef.current || conversation.status === 'connected') {
+        console.log('Component unmounting, cleaning up session...');
         conversation.endSession().catch(console.error);
       }
     };
-  }, [conversationId, conversation]);
+  }, []);
 
-  // Check if connected based on conversation status
-  const isConnected = conversation.status === 'connected' && conversationId !== null;
+  // Check if connected based on conversation status and session state
+  const isConnected = sessionActive && conversation.status === 'connected';
 
   return (
     <div className="flex-1 flex items-center justify-center px-4">
@@ -222,7 +262,14 @@ Remember to match the learner's level - don't use language that's too advanced o
           </p>
         </div>
         
-        {/* Setup Instructions - removed since we now have a valid agent ID */}
+        {/* Debug info in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="absolute -bottom-24 left-1/2 transform -translate-x-1/2 text-center">
+            <p className="text-xs text-muted-foreground/50">
+              Status: {conversation.status} | Session: {sessionIdRef.current ? 'Active' : 'None'}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
