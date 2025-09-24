@@ -168,6 +168,64 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
+          {/* Your Practice List */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Practice List</CardTitle>
+              <CardDescription>Suggested words and phrases to improve your pronunciation</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3">
+                {profile?.skill_level === "A1" || profile?.skill_level === "A2" ? (
+                  <>
+                    <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
+                      <p className="font-medium mb-1">negotiate</p>
+                      <p className="text-sm text-muted-foreground">ne-GOH-shee-ate - "Let's negotiate the terms"</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
+                      <p className="font-medium mb-1">schedule</p>
+                      <p className="text-sm text-muted-foreground">SKED-yool - "Can we schedule a meeting?"</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
+                      <p className="font-medium mb-1">colleague</p>
+                      <p className="text-sm text-muted-foreground">KOL-eeg - "My colleague will join us"</p>
+                    </div>
+                  </>
+                ) : profile?.skill_level === "B1" || profile?.skill_level === "B2" ? (
+                  <>
+                    <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
+                      <p className="font-medium mb-1">prioritize</p>
+                      <p className="text-sm text-muted-foreground">pry-OR-ih-tize - "We need to prioritize our objectives"</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
+                      <p className="font-medium mb-1">stakeholder</p>
+                      <p className="text-sm text-muted-foreground">STAKE-hohl-der - "All stakeholders must approve"</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
+                      <p className="font-medium mb-1">implementation</p>
+                      <p className="text-sm text-muted-foreground">im-pleh-men-TAY-shun - "The implementation phase begins next week"</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
+                      <p className="font-medium mb-1">synergy</p>
+                      <p className="text-sm text-muted-foreground">SIN-er-jee - "We're looking for synergy between departments"</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
+                      <p className="font-medium mb-1">paradigm shift</p>
+                      <p className="text-sm text-muted-foreground">PAIR-uh-dime shift - "This represents a paradigm shift in our approach"</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
+                      <p className="font-medium mb-1">scalability</p>
+                      <p className="text-sm text-muted-foreground">skay-luh-BIL-ih-tee - "We must consider the scalability of this solution"</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Recent Activity Card (placeholder) */}
           <Card>
             <CardHeader>
