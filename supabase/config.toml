@@ -2,3 +2,6 @@ project_id = "mybwxaszvtwiwtxigibw"
 
 [functions.conversation]
 verify_jwt = true
+
+[functions.elevenlabs-agent]
+verify_jwt = true
