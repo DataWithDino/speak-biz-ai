@@ -7,13 +7,16 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Send, Mic, MicOff, Volume2, Square, ArrowLeft, Save } from "lucide-react";
+import { Send, Mic, MicOff, Volume2, Square, ArrowLeft, Save, MessageSquare, Headphones, Video } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
 }
+
+type InteractionMode = "text" | "audio" | "video";
 
 const Conversation = () => {
   const navigate = useNavigate();
@@ -31,6 +34,10 @@ const Conversation = () => {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>("text");
+  const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     checkAuth();
@@ -211,6 +218,60 @@ const Conversation = () => {
     }
   };
 
+  const startVideoCall = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }, 
+        audio: true 
+      });
+      setVideoStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      toast({
+        title: "Video started",
+        description: "Your camera is now active",
+      });
+    } catch (error) {
+      console.error("Error accessing camera:", error);
+      toast({
+        title: "Camera access denied",
+        description: "Please allow camera access to use video chat",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const stopVideoCall = () => {
+    if (videoStream) {
+      videoStream.getTracks().forEach(track => track.stop());
+      setVideoStream(null);
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    }
+  };
+
+  const handleModeChange = (value: string) => {
+    if (value) {
+      // Stop any active streams when switching modes
+      if (interactionMode === "video") {
+        stopVideoCall();
+      } else if (interactionMode === "audio" && isRecording) {
+        stopRecording();
+      }
+      setInteractionMode(value as InteractionMode);
+      
+      // Start video automatically when switching to video mode
+      if (value === "video") {
+        startVideoCall();
+      }
+    }
+  };
+
   const playAudioMessage = (content: string) => {
     // Text-to-speech placeholder
     const utterance = new SpeechSynthesisUtterance(content);
@@ -267,112 +328,248 @@ const Conversation = () => {
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/dashboard")}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h2 className="font-semibold">{formatTopic(topic)}</h2>
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <span>with {formatPersona(persona)}</span>
-                <Badge variant="outline">{skillLevel}</Badge>
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/dashboard")}
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h2 className="font-semibold">{formatTopic(topic)}</h2>
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <span>with {formatPersona(persona)}</span>
+                  <Badge variant="outline">{skillLevel}</Badge>
+                </div>
               </div>
             </div>
+            <Button 
+              onClick={endConversation}
+              variant="destructive"
+              size="sm"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              End & Save
+            </Button>
           </div>
-          <Button 
-            onClick={endConversation}
-            variant="destructive"
-            size="sm"
-          >
-            <Save className="h-4 w-4 mr-2" />
-            End & Save
-          </Button>
+          
+          {/* Mode Selector */}
+          <div className="flex justify-center">
+            <ToggleGroup 
+              type="single" 
+              value={interactionMode} 
+              onValueChange={handleModeChange}
+              className="bg-muted/50 p-1 rounded-lg"
+            >
+              <ToggleGroupItem 
+                value="text" 
+                aria-label="Text chat"
+                className="data-[state=on]:bg-background data-[state=on]:shadow-sm"
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Text Chat
+              </ToggleGroupItem>
+              <ToggleGroupItem 
+                value="audio" 
+                aria-label="Audio chat"
+                className="data-[state=on]:bg-background data-[state=on]:shadow-sm"
+              >
+                <Headphones className="h-4 w-4 mr-2" />
+                Audio Chat
+              </ToggleGroupItem>
+              <ToggleGroupItem 
+                value="video" 
+                aria-label="Video chat"
+                className="data-[state=on]:bg-background data-[state=on]:shadow-sm"
+              >
+                <Video className="h-4 w-4 mr-2" />
+                Video Chat
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
         </div>
       </div>
 
-      {/* Messages Area */}
-      <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
-        <div className="max-w-3xl mx-auto py-4 space-y-4">
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <Card className={`max-w-[80%] p-4 ${
-                message.role === "user" 
-                  ? "bg-primary text-primary-foreground" 
-                  : "bg-muted"
-              }`}>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">
-                    {message.role === "user" ? "You" : formatPersona(persona)}
-                  </p>
-                  <p className="whitespace-pre-wrap">{message.content}</p>
-                  {message.role === "assistant" && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => playAudioMessage(message.content)}
-                      className="mt-2"
-                    >
-                      <Volume2 className="h-4 w-4 mr-1" />
-                      Play
-                    </Button>
-                  )}
-                </div>
-              </Card>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <Card className="bg-muted p-4">
-                <div className="flex items-center space-x-2">
-                  <div className="animate-pulse flex space-x-1">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <div className="w-2 h-2 bg-primary rounded-full animation-delay-200"></div>
-                    <div className="w-2 h-2 bg-primary rounded-full animation-delay-400"></div>
+      {/* Messages Area or Video Area */}
+      {interactionMode === "video" ? (
+        <div className="flex-1 px-4 py-4">
+          <div className="max-w-5xl mx-auto h-full flex gap-4">
+            {/* Local Video */}
+            <div className="flex-1 relative bg-muted rounded-lg overflow-hidden">
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur px-3 py-1 rounded-md">
+                <span className="text-sm font-medium">You</span>
+              </div>
+              {!videoStream && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <Video className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Camera is off</p>
                   </div>
-                  <span className="text-sm text-muted-foreground">Thinking...</span>
                 </div>
-              </Card>
+              )}
+            </div>
+            
+            {/* Remote Video Placeholder */}
+            <div className="flex-1 relative bg-muted rounded-lg overflow-hidden">
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur px-3 py-1 rounded-md">
+                <span className="text-sm font-medium">{formatPersona(persona)}</span>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <Video className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Video simulation mode</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
+          <div className="max-w-3xl mx-auto py-4 space-y-4">
+            {messages.map((message, index) => (
+              <div
+                key={index}
+                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <Card className={`max-w-[80%] p-4 ${
+                  message.role === "user" 
+                    ? "bg-primary text-primary-foreground" 
+                    : "bg-muted"
+                }`}>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">
+                      {message.role === "user" ? "You" : formatPersona(persona)}
+                    </p>
+                    <p className="whitespace-pre-wrap">{message.content}</p>
+                    {message.role === "assistant" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => playAudioMessage(message.content)}
+                        className="mt-2"
+                      >
+                        <Volume2 className="h-4 w-4 mr-1" />
+                        Play
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              </div>
+            ))}
+            {isLoading && (
+              <div className="flex justify-start">
+                <Card className="bg-muted p-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-pulse flex space-x-1">
+                      <div className="w-2 h-2 bg-primary rounded-full"></div>
+                      <div className="w-2 h-2 bg-primary rounded-full animation-delay-200"></div>
+                      <div className="w-2 h-2 bg-primary rounded-full animation-delay-400"></div>
+                    </div>
+                    <span className="text-sm text-muted-foreground">Thinking...</span>
+                  </div>
+                </Card>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      )}
+
+      {/* Input Area - Adaptive based on mode */}
+      <div className="border-t bg-background p-4">
+        <div className="max-w-3xl mx-auto">
+          {interactionMode === "text" && (
+            <div className="flex space-x-2">
+              <Input
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                disabled={isLoading}
+                className="flex-1"
+              />
+              <Button
+                onClick={handleSendMessage}
+                disabled={!inputMessage.trim() || isLoading}
+              >
+                <Send className="h-4 w-4" />
+              </Button>
             </div>
           )}
-        </div>
-      </ScrollArea>
-
-      {/* Input Area */}
-      <div className="border-t bg-background p-4">
-        <div className="max-w-3xl mx-auto flex space-x-2">
-          <Input
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Type your message..."
-            disabled={isLoading}
-            className="flex-1"
-          />
-          <Button
-            onClick={isRecording ? stopRecording : startRecording}
-            variant={isRecording ? "destructive" : "outline"}
-            size="icon"
-          >
-            {isRecording ? (
-              <Square className="h-4 w-4" />
-            ) : (
-              <Mic className="h-4 w-4" />
-            )}
-          </Button>
-          <Button
-            onClick={handleSendMessage}
-            disabled={!inputMessage.trim() || isLoading}
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+          
+          {interactionMode === "audio" && (
+            <div className="flex flex-col items-center space-y-4">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-2">
+                  {isRecording ? "Recording... Speak now" : "Press to start recording"}
+                </p>
+                <Button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  variant={isRecording ? "destructive" : "default"}
+                  size="lg"
+                  className="rounded-full h-20 w-20"
+                >
+                  {isRecording ? (
+                    <Square className="h-8 w-8" />
+                  ) : (
+                    <Mic className="h-8 w-8" />
+                  )}
+                </Button>
+              </div>
+              {isRecording && (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-pulse">
+                    <div className="h-2 w-2 bg-destructive rounded-full"></div>
+                  </div>
+                  <span className="text-sm text-muted-foreground">Recording active</span>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {interactionMode === "video" && (
+            <div className="flex justify-center space-x-4">
+              <Button
+                onClick={isRecording ? stopRecording : startRecording}
+                variant={isRecording ? "destructive" : "outline"}
+                size="icon"
+              >
+                {isRecording ? (
+                  <MicOff className="h-4 w-4" />
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                onClick={videoStream ? stopVideoCall : startVideoCall}
+                variant={videoStream ? "destructive" : "outline"}
+                size="icon"
+              >
+                <Video className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center space-x-2 px-3 py-2 bg-muted rounded-md">
+                <div className={`h-2 w-2 rounded-full ${videoStream ? "bg-green-500" : "bg-muted-foreground"}`}></div>
+                <span className="text-sm text-muted-foreground">
+                  {videoStream ? "Camera on" : "Camera off"}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
