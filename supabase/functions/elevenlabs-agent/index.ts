@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const elevenLabsApiKey = Deno.env.get('ELEVENLABS_API_KEY');
+const AGENT_ID = "agent_4301k5ysabajfbcsns6zmc0qfbe4";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,27 +21,33 @@ serve(async (req) => {
     
     const { topic, persona, skillLevel } = await req.json();
     
-    console.log('Setting up ElevenLabs agent for:', { topic, persona, skillLevel });
+    console.log('Getting signed URL for ElevenLabs agent:', { topic, persona, skillLevel });
 
-    // For ElevenLabs Voice Agents, we need to use a pre-created agent
-    // You should create agents in the ElevenLabs dashboard and use their IDs here
-    // For demo purposes, we'll return a placeholder response
-    
-    const response = {
-      success: true,
-      message: 'ElevenLabs Voice Agent requires a pre-configured agent ID. Please create an agent at https://elevenlabs.io/app/conversational-ai',
-      instructions: {
-        1: 'Go to ElevenLabs dashboard',
-        2: 'Create a new Conversational AI agent',
-        3: 'Configure the agent with your desired persona and settings',
-        4: 'Copy the agent ID and use it in the VoiceChat component'
+    // Get a signed URL for the conversation
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${AGENT_ID}`,
+      {
+        method: "GET",
+        headers: {
+          "xi-api-key": elevenLabsApiKey,
+        },
       }
-    };
+    );
 
-    console.log('Response:', response);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('ElevenLabs API error:', errorText);
+      throw new Error(`Failed to get signed URL: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('Successfully got signed URL');
 
     return new Response(
-      JSON.stringify(response),
+      JSON.stringify({ 
+        signedUrl: data.signed_url,
+        success: true 
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }

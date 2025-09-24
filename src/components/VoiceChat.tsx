@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useConversation } from '@11labs/react';
 import { Mic, Headphones, MicOff } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface VoiceChatProps {
   topic: string;
@@ -37,9 +38,8 @@ Your role:
 
 Remember to match the learner's level - don't use language that's too advanced or too simple for ${skillLevel}.`;
 
-  // Use a demo agent ID - you need to create an agent in ElevenLabs dashboard
-  // and replace this with your actual agent ID
-  const DEMO_AGENT_ID = "YOUR_AGENT_ID_HERE";
+  // ElevenLabs agent ID for conversation
+  const AGENT_ID = "agent_4301k5ysabajfbcsns6zmc0qfbe4";
 
   const conversation = useConversation({
     overrides: {
@@ -88,23 +88,26 @@ Remember to match the learner's level - don't use language that's too advanced o
       // Request microphone permission
       await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      // Show setup instructions
-      toast({
-        title: "Setup Required",
-        description: "ElevenLabs Voice Agents require configuration. Please visit elevenlabs.io/app/conversational-ai to set up your agent.",
-        variant: "destructive",
+      // Get signed URL from our edge function
+      const { data, error } = await supabase.functions.invoke('elevenlabs-agent', {
+        body: { topic, persona, skillLevel }
+      });
+
+      if (error || !data?.signedUrl) {
+        throw new Error(error?.message || 'Failed to get conversation URL');
+      }
+
+      // Connect to the ElevenLabs agent using the signed URL
+      const conversationId = await conversation.startSession({
+        signedUrl: data.signedUrl
       });
       
-      // For now, simulate connection for demo purposes
-      setIsConnected(true);
-      setTimeout(() => {
-        setIsConnected(false);
-      }, 5000);
+      console.log('Started conversation with ID:', conversationId);
     } catch (error) {
       console.error('Error starting conversation:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to start conversation',
+        description: error instanceof Error ? error.message : 'Failed to start conversation. Make sure your agent is properly configured.',
         variant: "destructive",
       });
     }
@@ -185,23 +188,7 @@ Remember to match the learner's level - don't use language that's too advanced o
           </p>
         </div>
         
-        {/* Setup Instructions */}
-        {DEMO_AGENT_ID === "YOUR_AGENT_ID_HERE" && (
-          <div className="absolute -bottom-32 left-1/2 transform -translate-x-1/2 text-center w-80">
-            <p className="text-xs text-muted-foreground">
-              To enable voice chat: Create an agent at{' '}
-              <a 
-                href="https://elevenlabs.io/app/conversational-ai" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="underline hover:text-primary"
-              >
-                elevenlabs.io
-              </a>{' '}
-              and update the agent ID in the code
-            </p>
-          </div>
-        )}
+        {/* Setup Instructions - removed since we now have a valid agent ID */}
       </div>
     </div>
   );
