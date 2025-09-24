@@ -14,7 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      conversations: {
+        Row: {
+          ai_persona: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          skill_level: Database["public"]["Enums"]["skill_level"]
+          started_at: string
+          topic: string
+          transcript: Json
+          user_id: string
+        }
+        Insert: {
+          ai_persona: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          skill_level: Database["public"]["Enums"]["skill_level"]
+          started_at?: string
+          topic: string
+          transcript?: Json
+          user_id: string
+        }
+        Update: {
+          ai_persona?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          skill_level?: Database["public"]["Enums"]["skill_level"]
+          started_at?: string
+          topic?: string
+          transcript?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          skill_level: Database["public"]["Enums"]["skill_level"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          skill_level?: Database["public"]["Enums"]["skill_level"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          skill_level?: Database["public"]["Enums"]["skill_level"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +88,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      skill_level: "A1" | "A2" | "B1" | "B2" | "C1" | "C2"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +215,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      skill_level: ["A1", "A2", "B1", "B2", "C1", "C2"],
+    },
   },
 } as const
