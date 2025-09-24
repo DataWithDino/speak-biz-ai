@@ -393,7 +393,7 @@ const Conversation = () => {
         </div>
       </div>
 
-      {/* Messages Area or Video Area */}
+      {/* Messages Area or Video Area or Audio Bubble */}
       {interactionMode === "video" ? (
         <div className="flex-1 px-4 py-4">
           <div className="max-w-5xl mx-auto h-full flex gap-4">
@@ -436,6 +436,55 @@ const Conversation = () => {
                   <p className="text-sm text-muted-foreground">Video simulation mode</p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      ) : interactionMode === "audio" ? (
+        <div className="flex-1 flex items-center justify-center px-4">
+          <div className="relative">
+            {/* Outer glow effect */}
+            <div className="absolute inset-0 blur-3xl opacity-20">
+              <div className="w-64 h-64 rounded-full bg-gradient-to-br from-primary via-primary/50 to-transparent animate-pulse" />
+            </div>
+            
+            {/* Main bubble container */}
+            <div className="relative w-64 h-64 flex items-center justify-center">
+              {/* Animated rings */}
+              <div className="absolute inset-0 rounded-full border-2 border-primary/20 animate-ping" />
+              <div className="absolute inset-4 rounded-full border-2 border-primary/30 animate-ping animation-delay-200" />
+              <div className="absolute inset-8 rounded-full border-2 border-primary/40 animate-ping animation-delay-400" />
+              
+              {/* Core bubble */}
+              <div className={`relative w-48 h-48 rounded-full bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center transition-all duration-300 ${
+                isRecording ? 'scale-110 shadow-2xl shadow-primary/50' : 'scale-100 shadow-xl shadow-primary/30'
+              }`}>
+                {/* Inner glow */}
+                <div className="absolute inset-4 rounded-full bg-gradient-to-tr from-white/20 to-transparent blur-md" />
+                
+                {/* Icon */}
+                <div className="relative z-10">
+                  {isRecording ? (
+                    <Mic className="w-16 h-16 text-white animate-pulse" />
+                  ) : (
+                    <Headphones className="w-16 h-16 text-white" />
+                  )}
+                </div>
+                
+                {/* Sound wave effect when recording */}
+                {isRecording && (
+                  <>
+                    <div className="absolute inset-0 rounded-full border-4 border-white/30 animate-ping" />
+                    <div className="absolute inset-0 rounded-full border-4 border-white/20 animate-ping animation-delay-200" />
+                  </>
+                )}
+              </div>
+            </div>
+            
+            {/* Status text */}
+            <div className="absolute -bottom-12 left-1/2 transform -translate-x-1/2 text-center">
+              <p className="text-sm font-medium text-muted-foreground">
+                {isRecording ? 'Listening...' : 'Ready to chat'}
+              </p>
             </div>
           </div>
         </div>
