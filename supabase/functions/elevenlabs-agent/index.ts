@@ -9,8 +9,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface ActiveSession {
+  startTime: number;
+  agentId: string;
+  conversationId?: string;
+  lastActivity: number;
+  audioChunks: Array<{
+    data: string;
+    timestamp: number;
+    mimeType: string;
+  }>;
+  transcript: Array<{
+    role: string;
+    content: string;
+    timestamp: string;
+  }>;
+}
+
 // Store active sessions
-const activeSessions = new Map();
+const activeSessions = new Map<string, ActiveSession>();
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -187,23 +204,27 @@ async function handleStart(agentId: string, voiceId: string, apiKey: string) {
     
     console.log('[TRACE] API key validated successfully');
     
-    // For now, since the Conversational AI endpoint might not be available,
-    // let's create a mock session and use text-to-speech instead
+    // Create mock session and store it
+    const session: ActiveSession = {
+      startTime: Date.now(),
+      agentId,
+      conversationId: crypto.randomUUID(),
+      lastActivity: Date.now(),
+      audioChunks: [],
+      transcript: []
+    };
+    
     console.log(`[TRACE] Creating mock session for agent: ${agentId}`);
     
     // Store session info
-    activeSessions.set(sessionId, {
-      conversationId: sessionId,
-      transcript: [],
-      startTime: Date.now(),
-    });
+    activeSessions.set(sessionId, session);
 
     console.log(`[TRACE] Session created successfully: ${sessionId}`);
 
     return new Response(
       JSON.stringify({ 
         sessionId, 
-        conversationId: sessionId,
+        conversationId: session.conversationId,
         status: 'mock_session' // Indicate this is a mock session
       }),
       {
@@ -225,31 +246,38 @@ async function handleStream(sessionId: string, audioData: string, mimeType: stri
     }
 
     // Convert base64 back to binary
-    const binaryData = Uint8Array.from(atob(audioData), c => c.charCodeAt(0));
+    const audioBuffer = Uint8Array.from(atob(audioData), c => c.charCodeAt(0));
     
     console.log(`[TRACE] Received audio chunk:`, {
       sessionId,
       mimeType,
-      audioSize: binaryData.length,
+      audioSize: audioBuffer.length,
       sessionActive: true
     });
     
-    // Store timestamp for later analysis
+    // Store audio chunk with timestamp
+    session.audioChunks.push({
+      data: audioData,
+      timestamp: Date.now(),
+      mimeType: mimeType || 'audio/webm'
+    });
+
+    // Update session activity
     session.lastActivity = Date.now();
+    console.log(`[TRACE] Session activity updated for: ${sessionId}, stored audio chunk #${session.audioChunks.length}`);
+
+    // In a real implementation, you would:
+    // 1. Send the audio data to ElevenLabs for processing
+    // 2. Handle real-time conversation
+    // 3. Get responses from the AI agent
     
-    // Add to session transcript (mock processing)
-    if (Math.random() > 0.8) { // Simulate occasional transcript updates
-      session.transcript.push({
-        role: 'user',
-        content: '[Audio chunk received and processed]',
-        timestamp: new Date().toISOString()
-      });
-    }
+    // For now, simulate processing
+    console.log(`[TRACE] Processed ${audioBuffer.length} bytes of audio data`);
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        bytesReceived: binaryData.length 
+        bytesReceived: audioBuffer.length 
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -350,34 +378,12 @@ async function handleEnd(sessionId: string, apiKey: string) {
       }
     ];
 
-    // Generate realistic conversation transcript
-    const mockTranscript = [
-      {
-        role: "assistant",
-        content: "Good morning! Let's begin our quarterly review discussion. What aspects would you like to focus on first?",
-        timestamp: new Date(session.startTime).toISOString()
-      },
-      {
-        role: "user",
-        content: "I'd like to start with our revenue projections and how they align with our targets.",
-        timestamp: new Date(session.startTime + 15000).toISOString()
-      },
-      {
-        role: "assistant",
-        content: "Excellent starting point. Based on current performance metrics, we're tracking 12% above projected revenue. What factors do you think contributed most to this positive variance?",
-        timestamp: new Date(session.startTime + 30000).toISOString()
-      },
-      {
-        role: "user",
-        content: "I believe our improved market penetration in the European sector and the successful cost-benefit analysis of our new product line were key drivers.",
-        timestamp: new Date(session.startTime + 45000).toISOString()
-      },
-      {
-        role: "assistant",
-        content: "That's a comprehensive assessment. The stakeholder alignment we achieved early in the quarter certainly facilitated these improvements. Shall we dive deeper into the specific metrics?",
-        timestamp: new Date(session.startTime + 60000).toISOString()
-      }
-    ];
+    // Generate conversation transcript based on session data
+    const conversationTranscript = session.audioChunks && session.audioChunks.length > 0 
+      ? generateTranscriptFromAudio(session.audioChunks, session.startTime)
+      : generateDefaultTranscript(session.startTime);
+
+    console.log(`[TRACE] Generated transcript with ${conversationTranscript.length} entries`);
 
     // Clean up session
     activeSessions.delete(sessionId);
@@ -386,11 +392,11 @@ async function handleEnd(sessionId: string, apiKey: string) {
       sessionId,
       duration: `${durationMinutes} minutes`,
       flashcardsGenerated: mockFlashcards.length,
-      transcriptEntries: mockTranscript.length
+      transcriptEntries: conversationTranscript.length
     });
 
     const response = {
-      transcript: mockTranscript,
+      transcript: conversationTranscript,
       flashcards: mockFlashcards,
       analysis: `Business English Learning Analysis
 
@@ -489,23 +495,117 @@ async function handleTTS(text: string, voiceId: string, apiKey: string) {
     // Convert audio to base64
     const audioBuffer = await response.arrayBuffer();
     const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+    const data = `data:audio/mpeg;base64,${base64Audio}`;
 
     return new Response(
-      JSON.stringify({ audioUrl: `data:audio/mpeg;base64,${base64Audio}` }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      JSON.stringify({
+        success: true,
+        audioUrl: data
+      }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
+
   } catch (error) {
-    console.error('Error generating TTS:', error);
+    console.error('TTS Error:', error);
+    
+    // Return mock TTS response as fallback
+    const mockAudioUrl = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj';
+    
     return new Response(
-      JSON.stringify({ 
-        audioUrl: `data:audio/mpeg;base64,`,
-        message: 'TTS service unavailable'
+      JSON.stringify({
+        success: false,
+        audioUrl: mockAudioUrl,
+        error: 'TTS service temporarily unavailable'
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   }
+}
+
+// Helper function to generate transcript from audio chunks
+function generateTranscriptFromAudio(audioChunks: Array<{data: string, timestamp: number, mimeType: string}>, startTime: number) {
+  // In a real implementation, you would process the audio chunks with a speech-to-text service
+  // For now, we'll generate a more realistic transcript based on the audio data received
+  
+  const transcript = [];
+  let currentTime = startTime;
+  
+  // Generate conversation based on the number of audio chunks received
+  const conversationPairs = [
+    {
+      assistant: "Hello! I'm here to help you practice your business English. What topic would you like to focus on today?",
+      user: "I'd like to practice discussing quarterly business reviews and financial performance."
+    },
+    {
+      assistant: "Excellent choice! Let's start with revenue analysis. Can you tell me about your company's performance this quarter?",
+      user: "Well, our revenue projections show we're exceeding targets by about 15% this quarter."
+    },
+    {
+      assistant: "That's impressive growth! What factors contributed to this strong performance?",
+      user: "I think our market penetration strategy and cost-benefit analysis really paid off."
+    },
+    {
+      assistant: "Great use of business terminology! Can you elaborate on your market penetration approach?",
+      user: "We focused on stakeholder alignment and expanded our customer base in emerging markets."
+    },
+    {
+      assistant: "Perfect! You're demonstrating excellent command of business vocabulary. Let's practice some more complex scenarios.",
+      user: "That sounds good. I want to improve my confidence in executive-level discussions."
+    }
+  ];
+  
+  // Use the number of audio chunks to determine how much of the conversation happened
+  const chunksReceived = audioChunks.length;
+  const conversationLength = Math.min(Math.ceil(chunksReceived / 2), conversationPairs.length);
+  
+  for (let i = 0; i < conversationLength; i++) {
+    const pair = conversationPairs[i];
+    
+    // Add assistant message
+    transcript.push({
+      role: "assistant",
+      content: pair.assistant,
+      timestamp: new Date(currentTime).toISOString()
+    });
+    currentTime += 20000; // 20 seconds later
+    
+    // Add user message if we have enough audio chunks
+    if (i * 2 + 1 < chunksReceived) {
+      transcript.push({
+        role: "user", 
+        content: pair.user,
+        timestamp: new Date(currentTime).toISOString()
+      });
+      currentTime += 25000; // 25 seconds later
+    }
+  }
+  
+  return transcript;
+}
+
+// Helper function to generate default transcript when no audio chunks are available
+function generateDefaultTranscript(startTime: number) {
+  return [
+    {
+      role: "assistant",
+      content: "Hello! Welcome to your business English practice session. I'm ready to help you improve your professional communication skills.",
+      timestamp: new Date(startTime).toISOString()
+    },
+    {
+      role: "user",
+      content: "Thank you! I'm looking forward to practicing business vocabulary and professional scenarios.",
+      timestamp: new Date(startTime + 10000).toISOString()
+    },
+    {
+      role: "assistant",
+      content: "Excellent! Let's begin with some key business terms and work through practical examples together.",
+      timestamp: new Date(startTime + 20000).toISOString()
+    }
+  ];
 }
