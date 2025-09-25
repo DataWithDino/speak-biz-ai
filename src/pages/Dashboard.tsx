@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User, BookOpen, LogOut, MessageSquare, Menu, Activity, Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { User, BookOpen, LogOut, MessageSquare, Menu, Activity, Calendar, Clock, ChevronLeft, ChevronRight, Volume2, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ConversationSetup from "@/components/ConversationSetup";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -37,6 +37,17 @@ interface Conversation {
   analysis?: string;
 }
 
+interface FlashCard {
+  term: string;
+  definition: string;
+  example_sentence: string;
+  german_translation: string;
+  common_mistake: string;
+  correction: string;
+  cefr_level: string;
+  topic_tag: string;
+}
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -46,11 +57,53 @@ const Dashboard = () => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const conversationsPerPage = 3;
+  const [selectedFlashcard, setSelectedFlashcard] = useState<FlashCard | null>(null);
+  const [audioLoading, setAudioLoading] = useState(false);
 
   useEffect(() => {
     fetchProfile();
     fetchRecentConversations();
   }, []);
+
+  const playPronunciation = async (text: string) => {
+    setAudioLoading(true);
+    
+    try {
+      // Use browser's built-in speech synthesis
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        speechSynthesis.speak(utterance);
+        
+        // Wait for speech to finish
+        utterance.onend = () => {
+          setAudioLoading(false);
+        };
+        
+        utterance.onerror = () => {
+          setAudioLoading(false);
+          toast({
+            title: "Pronunciation Error",
+            description: "Could not play pronunciation",
+            variant: "destructive",
+          });
+        };
+      } else {
+        // Fallback if speech synthesis not supported
+        toast({
+          title: "Not Supported",
+          description: "Your browser doesn't support text-to-speech",
+          variant: "destructive",
+        });
+        setAudioLoading(false);
+      }
+    } catch (error) {
+      console.error('Pronunciation error:', error);
+      setAudioLoading(false);
+    }
+  };
 
   const fetchRecentConversations = async () => {
     try {
@@ -178,56 +231,91 @@ const Dashboard = () => {
                   <Card>
                     <CardHeader>
                       <CardTitle>Your Practice List</CardTitle>
-                      <CardDescription>Suggested words and phrases to improve your pronunciation</CardDescription>
+                      <CardDescription>Click on any flashcard to practice pronunciation</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="grid gap-3">
-                        {profile?.skill_level === "A1" || profile?.skill_level === "A2" ? (
-                          <>
-                            <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
-                              <p className="font-medium mb-1">negotiate</p>
-                              <p className="text-sm text-muted-foreground">ne-GOH-shee-ate - "Let's negotiate the terms"</p>
+                        {/* Mock flashcards from Study page */}
+                        <div 
+                          className="p-4 rounded-lg bg-gradient-to-r from-primary/5 to-secondary/5 border border-primary/10 hover:border-primary/20 cursor-pointer transition-all hover:shadow-sm"
+                          onClick={() => setSelectedFlashcard({
+                            term: "synergy",
+                            definition: "The interaction of two or more organizations to produce a combined effect greater than the sum of their separate effects",
+                            example_sentence: "We need to create synergy between our departments.",
+                            german_translation: "Synergie",
+                            common_mistake: "Using 'synergy' when you mean simple cooperation",
+                            correction: "Use 'synergy' only when describing enhanced combined effects",
+                            cefr_level: "C1",
+                            topic_tag: "business_strategy"
+                          })}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <p className="font-semibold text-primary mb-1">synergy</p>
+                              <p className="text-xs text-muted-foreground italic">SIN-er-jee</p>
+                              <p className="text-sm text-muted-foreground mt-2">Interaction producing greater combined effect</p>
                             </div>
-                            <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
-                              <p className="font-medium mb-1">schedule</p>
-                              <p className="text-sm text-muted-foreground">SKED-yool - "Can we schedule a meeting?"</p>
+                            <Volume2 className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <Badge variant="secondary" className="text-xs">C1</Badge>
+                            <Badge variant="outline" className="text-xs">business strategy</Badge>
+                          </div>
+                        </div>
+
+                        <div 
+                          className="p-4 rounded-lg bg-gradient-to-r from-primary/5 to-secondary/5 border border-primary/10 hover:border-primary/20 cursor-pointer transition-all hover:shadow-sm"
+                          onClick={() => setSelectedFlashcard({
+                            term: "stakeholder",
+                            definition: "A person or organization that has an interest in or is affected by a business decision",
+                            example_sentence: "All stakeholders must approve this proposal.",
+                            german_translation: "Interessenvertreter",
+                            common_mistake: "Confusing 'stakeholder' with 'shareholder'",
+                            correction: "Stakeholders include anyone affected; shareholders own stock",
+                            cefr_level: "B2",
+                            topic_tag: "business_management"
+                          })}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <p className="font-semibold text-primary mb-1">stakeholder</p>
+                              <p className="text-xs text-muted-foreground italic">STAKE-hohl-der</p>
+                              <p className="text-sm text-muted-foreground mt-2">Person with interest in business decision</p>
                             </div>
-                            <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
-                              <p className="font-medium mb-1">colleague</p>
-                              <p className="text-sm text-muted-foreground">KOL-eeg - "My colleague will join us"</p>
+                            <Volume2 className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <Badge variant="secondary" className="text-xs">B2</Badge>
+                            <Badge variant="outline" className="text-xs">business management</Badge>
+                          </div>
+                        </div>
+
+                        <div 
+                          className="p-4 rounded-lg bg-gradient-to-r from-primary/5 to-secondary/5 border border-primary/10 hover:border-primary/20 cursor-pointer transition-all hover:shadow-sm"
+                          onClick={() => setSelectedFlashcard({
+                            term: "quarterly review",
+                            definition: "A regular assessment of performance and progress conducted every three months",
+                            example_sentence: "Our quarterly review showed strong growth.",
+                            german_translation: "Quartalsbericht",
+                            common_mistake: "Saying 'quarter review' instead of 'quarterly review'",
+                            correction: "Use 'quarterly' (adjective) not 'quarter' (noun)",
+                            cefr_level: "B1",
+                            topic_tag: "business_reporting"
+                          })}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <p className="font-semibold text-primary mb-1">quarterly review</p>
+                              <p className="text-xs text-muted-foreground italic">KWAR-ter-lee ree-VYOO</p>
+                              <p className="text-sm text-muted-foreground mt-2">Three-month performance assessment</p>
                             </div>
-                          </>
-                        ) : profile?.skill_level === "B1" || profile?.skill_level === "B2" ? (
-                          <>
-                            <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
-                              <p className="font-medium mb-1">prioritize</p>
-                              <p className="text-sm text-muted-foreground">pry-OR-ih-tize - "We need to prioritize our objectives"</p>
-                            </div>
-                            <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
-                              <p className="font-medium mb-1">stakeholder</p>
-                              <p className="text-sm text-muted-foreground">STAKE-hohl-der - "All stakeholders must approve"</p>
-                            </div>
-                            <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
-                              <p className="font-medium mb-1">implementation</p>
-                              <p className="text-sm text-muted-foreground">im-pleh-men-TAY-shun - "The implementation phase begins next week"</p>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
-                              <p className="font-medium mb-1">synergy</p>
-                              <p className="text-sm text-muted-foreground">SIN-er-jee - "We're looking for synergy between departments"</p>
-                            </div>
-                            <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
-                              <p className="font-medium mb-1">paradigm shift</p>
-                              <p className="text-sm text-muted-foreground">PAIR-uh-dime shift - "This represents a paradigm shift in our approach"</p>
-                            </div>
-                            <div className="p-3 rounded-lg bg-secondary/20 border border-secondary/30">
-                              <p className="font-medium mb-1">scalability</p>
-                              <p className="text-sm text-muted-foreground">skay-luh-BIL-ih-tee - "We must consider the scalability of this solution"</p>
-                            </div>
-                          </>
-                        )}
+                            <Volume2 className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <Badge variant="secondary" className="text-xs">B1</Badge>
+                            <Badge variant="outline" className="text-xs">business reporting</Badge>
+                          </div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -482,6 +570,106 @@ const Dashboard = () => {
                 )}
               </div>
             </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Pronunciation Practice Modal */}
+      {selectedFlashcard && (
+        <Dialog open={!!selectedFlashcard} onOpenChange={() => setSelectedFlashcard(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-primary flex items-center justify-between">
+                <span>{selectedFlashcard.term}</span>
+                <button
+                  onClick={() => setSelectedFlashcard(null)}
+                  className="p-1 rounded-md hover:bg-secondary/20 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-6 mt-4">
+              {/* Pronunciation Section - Most Important */}
+              <div className="bg-gradient-to-r from-primary/10 to-secondary/10 p-6 rounded-lg border border-primary/20">
+                <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                  <Volume2 className="h-5 w-5 text-primary" />
+                  Pronunciation Practice
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="default"
+                      size="lg"
+                      onClick={() => playPronunciation(selectedFlashcard.term)}
+                      disabled={audioLoading}
+                      className="flex-1"
+                    >
+                      {audioLoading ? (
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      ) : (
+                        <>
+                          <Volume2 className="h-5 w-5 mr-2" />
+                          Play Term
+                        </>
+                      )}
+                    </Button>
+                    <span className="text-lg italic text-muted-foreground">
+                      {selectedFlashcard.term === "synergy" && "SIN-er-jee"}
+                      {selectedFlashcard.term === "stakeholder" && "STAKE-hohl-der"}
+                      {selectedFlashcard.term === "quarterly review" && "KWAR-ter-lee ree-VYOO"}
+                    </span>
+                  </div>
+                  
+                  <div className="mt-4 p-4 bg-background rounded-md border">
+                    <p className="font-medium mb-2">Example Sentence:</p>
+                    <p className="italic text-muted-foreground mb-3">"{selectedFlashcard.example_sentence}"</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => playPronunciation(selectedFlashcard.example_sentence)}
+                      disabled={audioLoading}
+                    >
+                      <Volume2 className="h-4 w-4 mr-2" />
+                      Play Example
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Definition */}
+              <div>
+                <h3 className="font-semibold mb-2">Definition:</h3>
+                <p className="text-muted-foreground">{selectedFlashcard.definition}</p>
+              </div>
+
+              {/* Common Mistakes */}
+              <div className="bg-gradient-to-r from-red-50 to-green-50 dark:from-red-950/20 dark:to-green-950/20 p-4 rounded-lg border">
+                <h3 className="font-semibold mb-3">Learn from Common Mistakes:</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="bg-destructive/5 border border-destructive/20 p-3 rounded-md">
+                    <h4 className="font-medium text-sm text-destructive mb-1">❌ Avoid:</h4>
+                    <p className="text-sm italic">{selectedFlashcard.common_mistake}</p>
+                  </div>
+                  <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/50 p-3 rounded-md">
+                    <h4 className="font-medium text-sm text-green-700 dark:text-green-400 mb-1">✓ Correct:</h4>
+                    <p className="text-sm font-medium">{selectedFlashcard.correction}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Info */}
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex gap-2">
+                  <Badge variant="secondary">{selectedFlashcard.cefr_level}</Badge>
+                  <Badge variant="outline">{selectedFlashcard.topic_tag.replace('_', ' ')}</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium">German:</span> {selectedFlashcard.german_translation}
+                </p>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       )}
