@@ -197,15 +197,15 @@ const StudyView = () => {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Dashboard
               </Button>
-              <div>
-                <h1 className="text-3xl font-bold flex items-center space-x-2">
-                  <BookOpen className="h-8 w-8 text-primary" />
-                  <span>Study Session</span>
-                </h1>
-                <p className="text-muted-foreground mt-1">
-                  Review your business English learning cards
-                </p>
-              </div>
+                <div>
+                  <h1 className="text-3xl font-bold flex items-center space-x-2">
+                    <BookOpen className="h-8 w-8 text-primary" />
+                    <span>Your Learning Environment</span>
+                  </h1>
+                  <p className="text-muted-foreground mt-1">
+                    Master your mistakes and improve your business English
+                  </p>
+                </div>
             </div>
             
             <div className="flex space-x-2">
@@ -222,12 +222,22 @@ const StudyView = () => {
 
           {/* Analysis Summary */}
           {studyData?.analysis && (
-            <Card className="mb-8">
+            <Card className="mb-8 border-l-4 border-l-primary">
               <CardHeader>
-                <CardTitle>Session Analysis</CardTitle>
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 rounded-full bg-primary/10">
+                    <BookOpen className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">Your Learning Session Summary</CardTitle>
+                    <p className="text-sm text-muted-foreground">Key insights from your conversation</p>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">{studyData.analysis}</p>
+              <CardContent className="pt-4">
+                <div className="bg-gradient-to-r from-primary/5 to-secondary/5 p-4 rounded-lg">
+                  <p className="text-foreground leading-relaxed">{studyData.analysis}</p>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -298,15 +308,29 @@ const StudyView = () => {
 
                   <Separator />
 
-                  {/* Common Mistake & Correction */}
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-semibold text-sm mb-1 text-destructive">Common Mistake:</h4>
-                      <p className="text-sm text-muted-foreground">{card.common_mistake}</p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm mb-1 text-green-600">Correction:</h4>
-                      <p className="text-sm text-muted-foreground">{card.correction}</p>
+                  {/* Learning from Mistakes Section - Enhanced */}
+                  <div className="bg-gradient-to-r from-red-50 to-green-50 dark:from-red-950/20 dark:to-green-950/20 p-4 rounded-lg border">
+                    <h4 className="font-semibold text-base mb-3 flex items-center space-x-2">
+                      <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-xs font-bold text-primary">!</span>
+                      </div>
+                      <span>Learn from Common Mistakes</span>
+                    </h4>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="bg-destructive/5 border border-destructive/20 p-3 rounded-md">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <div className="h-2 w-2 bg-destructive rounded-full"></div>
+                          <h5 className="font-medium text-sm text-destructive">Avoid This:</h5>
+                        </div>
+                        <p className="text-sm text-foreground/80 italic">"{card.common_mistake}"</p>
+                      </div>
+                      <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/50 p-3 rounded-md">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <div className="h-2 w-2 bg-green-600 rounded-full"></div>
+                          <h5 className="font-medium text-sm text-green-700 dark:text-green-400">Say This Instead:</h5>
+                        </div>
+                        <p className="text-sm text-foreground/80 font-medium">"{card.correction}"</p>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
