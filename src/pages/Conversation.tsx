@@ -405,10 +405,14 @@ const Conversation = () => {
                 className="w-full h-full rounded-lg"
                 frameBorder="0"
                 allowFullScreen
-                allow="camera; microphone; fullscreen"
+                allow="camera *; microphone *; autoplay *; encrypted-media *; fullscreen *"
                 style={{ border: 'none', minHeight: '500px' }}
                 title="AI Conversational Agent"
               />
+              <div className="absolute top-4 right-4 bg-background/90 backdrop-blur px-3 py-2 rounded-md border border-border">
+                <p className="text-xs text-muted-foreground mb-1">🎤 Grant microphone access when prompted</p>
+                <p className="text-xs text-muted-foreground">Click the microphone icon in your browser's address bar if needed</p>
+              </div>
               <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur px-3 py-1 rounded-md">
                 <span className="text-sm font-medium">CEO</span>
               </div>
