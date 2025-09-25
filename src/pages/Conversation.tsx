@@ -121,9 +121,25 @@ const Conversation = () => {
     }
   };
 
-  const stopBackgroundRecording = () => {
-    transcriptRecorder.stopRecording();
-    setBackgroundRecordingActive(false);
+  const stopBackgroundRecording = async () => {
+    try {
+      let agentResponse = null;
+      
+      if (elevenlabsSessionId) {
+        agentResponse = await elevenlabsClient.endSession();
+        setElevenlabsSessionId(null);
+        console.log('ElevenLabs session ended with response:', agentResponse);
+      }
+      
+      transcriptRecorder.stopRecording();
+      setBackgroundRecordingActive(false);
+      
+      console.log('Background recording stopped');
+      return agentResponse;
+    } catch (error) {
+      console.error('Error stopping background recording:', error);
+      return null;
+    }
   };
 
   const handleConsentAccept = async () => {
@@ -207,24 +223,46 @@ const Conversation = () => {
       // Stop background recording and get analysis
       let studyData = null;
       if (elevenlabsSessionId && recordingEnabled) {
-        stopBackgroundRecording();
-        studyData = await elevenlabsClient.endSession();
+        studyData = await stopBackgroundRecording();
+      }
+
+      // Stop video call if active
+      if (videoStream) {
+        stopVideoCall();
       }
 
       // Save conversation to database
-      const { error } = await supabase.from("conversations").update({
-        transcript: studyData?.transcript || messages.map(m => ({
+      const updateData: any = {
+        ended_at: new Date().toISOString()
+      };
+
+      // Include transcript and analysis if available from ElevenLabs
+      if (studyData) {
+        updateData.transcript = studyData.transcript;
+        if (studyData.flashcards) {
+          updateData.flashcards = studyData.flashcards;
+        }
+        if (studyData.analysis) {
+          updateData.analysis = studyData.analysis;
+        }
+      } else {
+        // Fallback to conversation messages if no ElevenLabs data
+        updateData.transcript = messages.map(m => ({
           role: m.role,
           content: m.content,
           timestamp: m.timestamp.toISOString()
-        })),
-        ended_at: new Date().toISOString()
-      }).eq("id", conversationId);
+        }));
+      }
+
+      const { error } = await supabase
+        .from("conversations")
+        .update(updateData)
+        .eq("id", conversationId);
 
       if (error) throw error;
 
-      // Navigate to study view if we have analysis data
-      if (studyData && studyData.flashcards.length > 0) {
+      // Navigate to study view if we have flashcards data
+      if (studyData && studyData.flashcards && studyData.flashcards.length > 0) {
         // Store study data in sessionStorage for the StudyView
         sessionStorage.setItem('studyData', JSON.stringify(studyData));
         navigate('/study');

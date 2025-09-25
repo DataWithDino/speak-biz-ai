@@ -2,7 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const elevenLabsApiKey = Deno.env.get('ELEVENLABS_API_KEY');
-const AGENT_ID = "agent_4301k5ysabajfbcsns6zmc0qfbe4";
+const AGENT_ID = "agent_2901k609n6fremxtqcaxw45412t1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -313,7 +313,7 @@ async function handleTTS(text: string, voiceId: string, apiKey: string) {
     const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
 
     return new Response(
-      JSON.stringify({ audioContent: base64Audio }),
+      JSON.stringify({ audioUrl: `data:audio/mpeg;base64,${base64Audio}` }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
