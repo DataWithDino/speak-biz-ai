@@ -12,6 +12,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
+import { elevenlabsClient } from "@/services/elevenlabsClient";
 
 type SkillLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 
@@ -59,6 +60,7 @@ const Dashboard = () => {
   const conversationsPerPage = 3;
   const [selectedFlashcard, setSelectedFlashcard] = useState<FlashCard | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
+  const [audioUrls, setAudioUrls] = useState<{[key: string]: string}>({});
 
   useEffect(() => {
     fetchProfile();
@@ -66,41 +68,44 @@ const Dashboard = () => {
   }, []);
 
   const playPronunciation = async (text: string) => {
+    const audioKey = text;
+    
+    // Check if audio is already cached
+    if (audioUrls[audioKey]) {
+      const audio = new Audio(audioUrls[audioKey]);
+      audio.play();
+      return;
+    }
+
     setAudioLoading(true);
     
     try {
-      // Use browser's built-in speech synthesis
+      // Use Roger voice (professional male voice) for business English - same as Study page
+      const voiceId = "CwhRBWXzGAHq8TQ4Fs17"; // Roger - clear professional voice
+      const audioUrl = await elevenlabsClient.generateTTS(text, voiceId);
+      
+      // Store the URL for future playback
+      setAudioUrls(prev => ({ ...prev, [audioKey]: audioUrl }));
+      
+      // Play the audio
+      const audio = new Audio(audioUrl);
+      await audio.play();
+    } catch (error) {
+      console.error('Failed to generate TTS:', error);
+      toast({
+        title: "Audio Playback",
+        description: "Using fallback pronunciation. Check your ElevenLabs API key.",
+        variant: "default",
+      });
+      
+      // Fallback to browser's built-in speech synthesis
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'en-US';
         utterance.rate = 0.9;
-        utterance.pitch = 1.0;
         speechSynthesis.speak(utterance);
-        
-        // Wait for speech to finish
-        utterance.onend = () => {
-          setAudioLoading(false);
-        };
-        
-        utterance.onerror = () => {
-          setAudioLoading(false);
-          toast({
-            title: "Pronunciation Error",
-            description: "Could not play pronunciation",
-            variant: "destructive",
-          });
-        };
-      } else {
-        // Fallback if speech synthesis not supported
-        toast({
-          title: "Not Supported",
-          description: "Your browser doesn't support text-to-speech",
-          variant: "destructive",
-        });
-        setAudioLoading(false);
       }
-    } catch (error) {
-      console.error('Pronunciation error:', error);
+    } finally {
       setAudioLoading(false);
     }
   };
