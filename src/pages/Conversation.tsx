@@ -2,45 +2,35 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Send, Mic, MicOff, Volume2, Square, ArrowLeft, Save, MessageSquare, Headphones, Video } from "lucide-react";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import VoiceChat from "@/components/VoiceChat";
+import { Mic, MicOff, ArrowLeft, Save, Video } from "lucide-react";
 interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
 }
-type InteractionMode = "text" | "audio" | "video";
+
 const Conversation = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  
   const topic = searchParams.get("topic") || "";
   const persona = searchParams.get("persona") || "";
   const skillLevel = searchParams.get("level") || "B1";
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputMessage, setInputMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
-  const [interactionMode, setInteractionMode] = useState<InteractionMode>("video");
+  
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  
   useEffect(() => {
     checkAuth();
     startConversation();
   }, []);
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
   const checkAuth = async () => {
     const {
       data: {
@@ -99,64 +89,6 @@ const Conversation = () => {
       "supplier": "Hello! I'm here to discuss our business arrangement."
     };
     return greetings[persona as keyof typeof greetings] || "Hello! Let's begin our conversation.";
-  };
-  const scrollToBottom = () => {
-    if (scrollAreaRef.current) {
-      const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
-      }
-    }
-  };
-  const sendMessage = async (content: string) => {
-    if (!content.trim() || isLoading) return;
-    const userMessage: Message = {
-      role: "user",
-      content: content.trim(),
-      timestamp: new Date()
-    };
-    setMessages(prev => [...prev, userMessage]);
-    setInputMessage("");
-    setIsLoading(true);
-    try {
-      const response = await supabase.functions.invoke("conversation", {
-        body: {
-          messages: [...messages, userMessage].map(m => ({
-            role: m.role,
-            content: m.content
-          })),
-          topic,
-          persona,
-          skillLevel
-        }
-      });
-      if (response.error) throw response.error;
-      const aiResponse = response.data.choices[0].message.content;
-      const aiMessage: Message = {
-        role: "assistant",
-        content: aiResponse,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, aiMessage]);
-    } catch (error) {
-      console.error("Error sending message:", error);
-      toast({
-        title: "Error",
-        description: "Failed to get AI response",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  const handleSendMessage = () => {
-    sendMessage(inputMessage);
-  };
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
   };
   const startRecording = async () => {
     try {
@@ -240,22 +172,6 @@ const Conversation = () => {
       }
     }
   };
-  const handleModeChange = (value: string) => {
-    if (value) {
-      // Stop any active streams when switching modes
-      if (interactionMode === "video") {
-        stopVideoCall();
-      } else if (interactionMode === "audio" && isRecording) {
-        stopRecording();
-      }
-      setInteractionMode(value as InteractionMode);
-
-      // Start video automatically when switching to video mode
-      if (value === "video") {
-        startVideoCall();
-      }
-    }
-  };
   const playAudioMessage = (content: string) => {
     // Text-to-speech placeholder
     const utterance = new SpeechSynthesisUtterance(content);
@@ -318,113 +234,43 @@ const Conversation = () => {
             </Button>
           </div>
           
-          {/* Mode Selector */}
-          <div className="flex justify-center">
-            <ToggleGroup type="single" value={interactionMode} onValueChange={handleModeChange} className="bg-muted/50 p-1 rounded-lg">
-              <ToggleGroupItem value="text" aria-label="Text chat" className="data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Text Chat
-              </ToggleGroupItem>
-              <ToggleGroupItem value="audio" aria-label="Audio chat" className="data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                <Headphones className="h-4 w-4 mr-2" />
-                Audio Chat
-              </ToggleGroupItem>
-              <ToggleGroupItem value="video" aria-label="Video chat" className="data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                <Video className="h-4 w-4 mr-2" />
-                Video Chat
-              </ToggleGroupItem>
-            </ToggleGroup>
+        </div>
+      </div>
+
+      {/* Video Area */}
+      <div className="flex-1 px-4 py-4">
+        <div className="max-w-4xl mx-auto h-full">
+          {/* AI Agent Video */}
+          <div className="relative bg-muted rounded-lg overflow-hidden h-full">
+            <iframe src="https://bey.chat/59ee6a14-f254-4b87-9a8e-706a9e56abf7" className="w-full h-full rounded-lg" frameBorder="0" allowFullScreen allow="camera *; microphone *; autoplay *; encrypted-media *; fullscreen *" style={{
+              border: 'none',
+              minHeight: '500px'
+            }} title="AI Conversational Agent" />
+            
+            <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur px-3 py-1 rounded-md">
+              <span className="text-sm font-medium">CEO</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Messages Area or Video Area or Audio Bubble */}
-      {interactionMode === "video" ? <div className="flex-1 px-4 py-4">
-          <div className="max-w-4xl mx-auto h-full">
-            {/* AI Agent Video */}
-            <div className="relative bg-muted rounded-lg overflow-hidden h-full">
-              <iframe src="https://bey.chat/59ee6a14-f254-4b87-9a8e-706a9e56abf7" className="w-full h-full rounded-lg" frameBorder="0" allowFullScreen allow="camera *; microphone *; autoplay *; encrypted-media *; fullscreen *" style={{
-            border: 'none',
-            minHeight: '500px'
-          }} title="AI Conversational Agent" />
-              
-              <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur px-3 py-1 rounded-md">
-                <span className="text-sm font-medium">CEO</span>
-              </div>
-            </div>
-          </div>
-        </div> : interactionMode === "audio" ? <VoiceChat topic={topic} persona={persona} skillLevel={skillLevel} /> : <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
-          <div className="max-w-3xl mx-auto py-4 space-y-4">
-            {messages.map((message, index) => <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                <Card className={`max-w-[80%] p-4 ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">
-                      {message.role === "user" ? "You" : formatPersona(persona)}
-                    </p>
-                    <p className="whitespace-pre-wrap">{message.content}</p>
-                    {message.role === "assistant" && <Button size="sm" variant="ghost" onClick={() => playAudioMessage(message.content)} className="mt-2">
-                        <Volume2 className="h-4 w-4 mr-1" />
-                        Play
-                      </Button>}
-                  </div>
-                </Card>
-              </div>)}
-            {isLoading && <div className="flex justify-start">
-                <Card className="bg-muted p-4">
-                  <div className="flex items-center space-x-2">
-                    <div className="animate-pulse flex space-x-1">
-                      <div className="w-2 h-2 bg-primary rounded-full"></div>
-                      <div className="w-2 h-2 bg-primary rounded-full animation-delay-200"></div>
-                      <div className="w-2 h-2 bg-primary rounded-full animation-delay-400"></div>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Thinking...</span>
-                  </div>
-                </Card>
-              </div>}
-          </div>
-        </ScrollArea>}
-
-      {/* Input Area - Adaptive based on mode */}
+      {/* Video Controls */}
       <div className="border-t bg-background p-4">
         <div className="max-w-3xl mx-auto">
-          {interactionMode === "text" && <div className="flex space-x-2">
-              <Input value={inputMessage} onChange={e => setInputMessage(e.target.value)} onKeyPress={handleKeyPress} placeholder="Type your message..." disabled={isLoading} className="flex-1" />
-              <Button onClick={handleSendMessage} disabled={!inputMessage.trim() || isLoading}>
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>}
-          
-          {interactionMode === "audio" && <div className="flex flex-col items-center space-y-4">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-2">
-                  {isRecording ? "Recording... Speak now" : "Press to start recording"}
-                </p>
-                <Button onClick={isRecording ? stopRecording : startRecording} variant={isRecording ? "destructive" : "default"} size="lg" className="rounded-full h-20 w-20">
-                  {isRecording ? <Square className="h-8 w-8" /> : <Mic className="h-8 w-8" />}
-                </Button>
-              </div>
-              {isRecording && <div className="flex items-center space-x-2">
-                  <div className="animate-pulse">
-                    <div className="h-2 w-2 bg-destructive rounded-full"></div>
-                  </div>
-                  <span className="text-sm text-muted-foreground">Recording active</span>
-                </div>}
-            </div>}
-          
-          {interactionMode === "video" && <div className="flex justify-center space-x-4">
-              <Button onClick={isRecording ? stopRecording : startRecording} variant={isRecording ? "destructive" : "outline"} size="icon">
-                {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-              </Button>
-              <Button onClick={videoStream ? stopVideoCall : startVideoCall} variant={videoStream ? "destructive" : "outline"} size="icon">
-                <Video className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center space-x-2 px-3 py-2 bg-muted rounded-md">
-                <div className={`h-2 w-2 rounded-full ${videoStream ? "bg-green-500" : "bg-muted-foreground"}`}></div>
-                <span className="text-sm text-muted-foreground">
-                  {videoStream ? "Camera on" : "Camera off"}
-                </span>
-              </div>
-            </div>}
+          <div className="flex justify-center space-x-4">
+            <Button onClick={isRecording ? stopRecording : startRecording} variant={isRecording ? "destructive" : "outline"} size="icon">
+              {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
+            <Button onClick={videoStream ? stopVideoCall : startVideoCall} variant={videoStream ? "destructive" : "outline"} size="icon">
+              <Video className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center space-x-2 px-3 py-2 bg-muted rounded-md">
+              <div className={`h-2 w-2 rounded-full ${videoStream ? "bg-green-500" : "bg-muted-foreground"}`}></div>
+              <span className="text-sm text-muted-foreground">
+                {videoStream ? "Camera on" : "Camera off"}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>;
