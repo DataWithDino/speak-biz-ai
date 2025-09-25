@@ -397,42 +397,20 @@ const Conversation = () => {
       {/* Messages Area or Video Area or Audio Bubble */}
       {interactionMode === "video" ? (
         <div className="flex-1 px-4 py-4">
-          <div className="max-w-5xl mx-auto h-full flex gap-4">
-            {/* Local Video */}
-            <div className="flex-1 relative bg-muted rounded-lg overflow-hidden">
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                playsInline
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur px-3 py-1 rounded-md">
-                <span className="text-sm font-medium">You</span>
-              </div>
-              {!videoStream && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <Video className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Camera is off</p>
-                  </div>
-                </div>
-              )}
-            </div>
-            
+          <div className="max-w-4xl mx-auto h-full">
             {/* AI Agent Video */}
-            <div className="flex-1 relative bg-muted rounded-lg overflow-hidden">
+            <div className="relative bg-muted rounded-lg overflow-hidden h-full">
               <iframe 
-                src="https://bey.chat/6fe011e3-9ca5-4ed2-ae33-eae6e72e5db4"
+                src="https://bey.chat/59ee6a14-f254-4b87-9a8e-706a9e56abf7"
                 className="w-full h-full rounded-lg"
                 frameBorder="0"
                 allowFullScreen
                 allow="camera; microphone; fullscreen"
-                style={{ border: 'none', minHeight: '400px' }}
+                style={{ border: 'none', minHeight: '500px' }}
                 title="AI Conversational Agent"
               />
               <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur px-3 py-1 rounded-md">
-                <span className="text-sm font-medium">{formatPersona(persona)} AI Agent</span>
+                <span className="text-sm font-medium">CEO</span>
               </div>
             </div>
           </div>
