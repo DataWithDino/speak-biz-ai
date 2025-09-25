@@ -4,11 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User, BookOpen, LogOut, MessageSquare, Menu } from "lucide-react";
+import { User, BookOpen, LogOut, MessageSquare, Menu, Activity, Calendar, Clock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ConversationSetup from "@/components/ConversationSetup";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { format } from "date-fns";
 
 type SkillLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 
@@ -38,6 +41,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showSetup, setShowSetup] = useState(false);
   const [recentConversations, setRecentConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
 
   useEffect(() => {
     fetchProfile();
@@ -59,7 +63,16 @@ const Dashboard = () => {
       if (error) {
         console.error("Error fetching conversations:", error);
       } else {
-        setRecentConversations(data || []);
+        // Type cast the transcript field properly
+        const typedConversations: Conversation[] = (data || []).map(conv => ({
+          ...conv,
+          transcript: conv.transcript as Array<{
+            role: "user" | "assistant";
+            content: string;
+            timestamp: string;
+          }>
+        }));
+        setRecentConversations(typedConversations);
       }
     } catch (error) {
       console.error("Error:", error);
@@ -216,13 +229,45 @@ const Dashboard = () => {
                 <div id="activity">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Recent Activity</CardTitle>
-                      <CardDescription>Your conversation history will appear here</CardDescription>
+                      <CardTitle className="flex items-center gap-2">
+                        <Activity className="h-5 w-5" />
+                        Recent Activity
+                      </CardTitle>
+                      <CardDescription>Your recent practice sessions</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-muted-foreground text-center py-8">
-                        No conversations yet. Start your first practice session above!
-                      </p>
+                      {recentConversations.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">
+                          No conversations yet. Start your first practice session above!
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {recentConversations.map((conversation) => (
+                            <div
+                              key={conversation.id}
+                              className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+                              onClick={() => setSelectedConversation(conversation)}
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                                  <p className="font-medium text-sm">{conversation.topic}</p>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <User className="h-3 w-3" />
+                                  <span>{conversation.ai_persona}</span>
+                                  <span>•</span>
+                                  <Calendar className="h-3 w-3" />
+                                  <span>{format(new Date(conversation.created_at), "MMM d, yyyy")}</span>
+                                </div>
+                              </div>
+                              <Badge variant="outline" className="text-xs">
+                                {conversation.skill_level}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
@@ -238,6 +283,70 @@ const Dashboard = () => {
         onClose={() => setShowSetup(false)}
         skillLevel={profile?.skill_level || "B1"}
       />
+
+      {/* Transcript Viewer Modal */}
+      {selectedConversation && (
+        <Dialog open={!!selectedConversation} onOpenChange={() => setSelectedConversation(null)}>
+          <DialogContent className="max-w-3xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span>{selectedConversation.topic}</span>
+                <Badge>{selectedConversation.skill_level}</Badge>
+              </DialogTitle>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <User className="h-4 w-4" />
+                  {selectedConversation.ai_persona}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  {format(new Date(selectedConversation.created_at), "PPP")}
+                </span>
+                {selectedConversation.ended_at && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    {Math.round(
+                      (new Date(selectedConversation.ended_at).getTime() - 
+                       new Date(selectedConversation.created_at).getTime()) / 60000
+                    )} minutes
+                  </span>
+                )}
+              </div>
+            </DialogHeader>
+            <ScrollArea className="h-[500px] mt-4">
+              <div className="space-y-4 pr-4">
+                {selectedConversation.transcript && selectedConversation.transcript.length > 0 ? (
+                  selectedConversation.transcript.map((message, index) => (
+                    <div
+                      key={index}
+                      className={`flex gap-3 ${
+                        message.role === "user" ? "justify-end" : "justify-start"
+                      }`}
+                    >
+                      <div
+                        className={`max-w-[70%] rounded-lg p-3 ${
+                          message.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted"
+                        }`}
+                      >
+                        <p className="text-sm">{message.content}</p>
+                        <p className="text-xs opacity-70 mt-1">
+                          {format(new Date(message.timestamp), "HH:mm:ss")}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-muted-foreground">
+                    No transcript available for this conversation.
+                  </p>
+                )}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      )}
     </SidebarProvider>
   );
 };
