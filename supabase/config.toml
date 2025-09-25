@@ -1,5 +1,8 @@
 project_id = "mybwxaszvtwiwtxigibw"
 
+[functions.beyondpresence-transcript]
+verify_jwt = true
+
 [functions.conversation]
 verify_jwt = true
 

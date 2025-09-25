@@ -25,6 +25,7 @@ const Conversation = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [elevenlabsSessionId, setElevenlabsSessionId] = useState<string | null>(null);
+  const [beyondPresenceCallId, setBeyondPresenceCallId] = useState<string | null>(null);
   
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -47,6 +48,37 @@ const Conversation = () => {
   useEffect(() => {
     checkAuth();
     startConversation();
+    
+    // Listen for messages from the BeyondPresence iframe
+    const handleMessage = (event: MessageEvent) => {
+      // Check if message is from BeyondPresence domain
+      if (event.origin.includes('bey.chat') || event.origin.includes('beyondpresence')) {
+        console.log('Received message from BeyondPresence:', event.data);
+        
+        // Extract call ID if provided
+        if (event.data?.callId) {
+          setBeyondPresenceCallId(event.data.callId);
+          console.log('BeyondPresence call ID captured:', event.data.callId);
+        }
+        
+        // Handle transcript updates if provided
+        if (event.data?.type === 'transcript' && event.data?.messages) {
+          // Update local messages with real-time transcript
+          const transcriptMessages = event.data.messages.map((msg: any) => ({
+            role: msg.speaker === 'agent' ? 'assistant' : 'user',
+            content: msg.text || msg.content,
+            timestamp: new Date(msg.timestamp || Date.now())
+          }));
+          setMessages(transcriptMessages);
+        }
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
   }, []);
 
   useEffect(() => {
@@ -197,6 +229,59 @@ const Conversation = () => {
     return greetings[persona as keyof typeof greetings] || "Hello! Let's begin our conversation.";
   };
 
+  // Function to get BeyondPresence call ID from iframe URL
+  const extractBeyondPresenceCallId = () => {
+    // Extract call ID from the BeyondPresence iframe URL if available
+    // This would typically come from the iframe's postMessage events
+    // For now, we'll need to implement message passing with the iframe
+    return null;
+  };
+
+  // Function to retrieve transcript from BeyondPresence
+  const getBeyondPresenceTranscript = async () => {
+    try {
+      // First, try to get recent calls to find our conversation
+      const { data: callsData, error: callsError } = await supabase.functions.invoke('beyondpresence-transcript', {
+        body: { action: 'list-calls' }
+      });
+
+      if (callsError) {
+        console.error('Error fetching BeyondPresence calls:', callsError);
+        return null;
+      }
+
+      // Find the most recent call (you might want to match by timestamp or other criteria)
+      const recentCall = callsData?.calls?.[0];
+      const callId = beyondPresenceCallId || recentCall?.id;
+
+      if (!callId) {
+        console.log('No BeyondPresence call ID found');
+        return null;
+      }
+
+      console.log('Fetching transcript for BeyondPresence call:', callId);
+
+      // Get the transcript for the specific call
+      const { data, error } = await supabase.functions.invoke('beyondpresence-transcript', {
+        body: { 
+          action: 'get-transcript',
+          callId: callId
+        }
+      });
+
+      if (error) {
+        console.error('Error fetching BeyondPresence transcript:', error);
+        return null;
+      }
+
+      console.log('BeyondPresence transcript retrieved:', data);
+      return data;
+    } catch (error) {
+      console.error('Error in getBeyondPresenceTranscript:', error);
+      return null;
+    }
+  };
+
   const startVideoCall = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -243,18 +328,26 @@ const Conversation = () => {
         stopVideoCall();
       }
 
-      // Stop background recording and get analysis
-      let studyData = null;
+      // Stop background recording if active
       if (elevenlabsClient.isActive() && recordingEnabled) {
-        console.log('Ending ElevenLabs session to get transcript...');
+        console.log('Stopping ElevenLabs session...');
         try {
-          studyData = await stopBackgroundRecording();
-          console.log('Received study data from ElevenLabs:', studyData);
+          await stopBackgroundRecording();
         } catch (error) {
           console.error('Error stopping background recording:', error);
         }
+      }
+
+      // First priority: Try to get transcript from BeyondPresence
+      let studyData = null;
+      console.log('Attempting to retrieve BeyondPresence transcript...');
+      const beyondPresenceData = await getBeyondPresenceTranscript();
+      
+      if (beyondPresenceData && beyondPresenceData.transcript && beyondPresenceData.transcript.length > 0) {
+        console.log('Successfully retrieved BeyondPresence transcript with', beyondPresenceData.transcript.length, 'messages');
+        studyData = beyondPresenceData;
       } else {
-        console.log('No active ElevenLabs session or recording disabled');
+        console.log('No BeyondPresence transcript available, using fallback');
       }
 
       // Save conversation to database
@@ -262,9 +355,9 @@ const Conversation = () => {
         ended_at: new Date().toISOString()
       };
 
-      // Include transcript and analysis if available from ElevenLabs
+      // Use BeyondPresence data if available
       if (studyData && studyData.transcript && studyData.transcript.length > 0) {
-        console.log('Using ElevenLabs transcript with', studyData.transcript.length, 'messages');
+        console.log('Using BeyondPresence transcript with', studyData.transcript.length, 'messages');
         updateData.transcript = studyData.transcript;
         if (studyData.flashcards) {
           updateData.flashcards = studyData.flashcards;
@@ -273,7 +366,7 @@ const Conversation = () => {
           updateData.analysis = studyData.analysis;
         }
       } else {
-        // Fallback to conversation messages if no ElevenLabs data
+        // Fallback to local messages if no external transcript available
         console.log('Using fallback transcript from local messages');
         updateData.transcript = messages.map(m => ({
           role: m.role,
