@@ -237,47 +237,28 @@ const Conversation = () => {
     return null;
   };
 
-  // Function to retrieve transcript from BeyondPresence
-  const getBeyondPresenceTranscript = async () => {
+  // Function to save transcript from BeyondPresence
+  const saveBeyondPresenceTranscript = async (callId: string) => {
     try {
-      // First, try to get recent calls to find our conversation
-      const { data: callsData, error: callsError } = await supabase.functions.invoke('beyondpresence-transcript', {
-        body: { action: 'list-calls' }
-      });
-
-      if (callsError) {
-        console.error('Error fetching BeyondPresence calls:', callsError);
-        return null;
-      }
-
-      // Find the most recent call (you might want to match by timestamp or other criteria)
-      const recentCall = callsData?.calls?.[0];
-      const callId = beyondPresenceCallId || recentCall?.id;
-
-      if (!callId) {
-        console.log('No BeyondPresence call ID found');
-        return null;
-      }
-
-      console.log('Fetching transcript for BeyondPresence call:', callId);
-
-      // Get the transcript for the specific call
+      console.log('[TRACE] Saving BeyondPresence transcript for call:', callId);
+      
       const { data, error } = await supabase.functions.invoke('beyondpresence-transcript', {
-        body: { 
-          action: 'get-transcript',
-          callId: callId
+        body: {
+          action: 'save-transcript',
+          callId: callId,
+          conversationId: conversationId
         }
       });
 
       if (error) {
-        console.error('Error fetching BeyondPresence transcript:', error);
+        console.error('[TRACE] Error saving BeyondPresence transcript:', error);
         return null;
       }
 
-      console.log('BeyondPresence transcript retrieved:', data);
+      console.log('[TRACE] BeyondPresence transcript saved:', data);
       return data;
     } catch (error) {
-      console.error('Error in getBeyondPresenceTranscript:', error);
+      console.error('[TRACE] Error in saveBeyondPresenceTranscript:', error);
       return null;
     }
   };
@@ -338,50 +319,39 @@ const Conversation = () => {
         }
       }
 
-      // First priority: Try to get transcript from BeyondPresence
+      // Try to save BeyondPresence transcript if we have a call ID
       let studyData = null;
-      console.log('Attempting to retrieve BeyondPresence transcript...');
-      const beyondPresenceData = await getBeyondPresenceTranscript();
-      
-      if (beyondPresenceData && beyondPresenceData.transcript && beyondPresenceData.transcript.length > 0) {
-        console.log('Successfully retrieved BeyondPresence transcript with', beyondPresenceData.transcript.length, 'messages');
-        studyData = beyondPresenceData;
-      } else {
-        console.log('No BeyondPresence transcript available, using fallback');
+      if (beyondPresenceCallId) {
+        console.log('[TRACE] Saving BeyondPresence transcript for call:', beyondPresenceCallId);
+        const beyondPresenceData = await saveBeyondPresenceTranscript(beyondPresenceCallId);
+        
+        if (beyondPresenceData && beyondPresenceData.transcript) {
+          console.log('[TRACE] Successfully saved BeyondPresence transcript');
+          studyData = beyondPresenceData;
+          
+          // Navigate directly to study view with the conversation ID
+          navigate(`/study?conversationId=${conversationId}`);
+          toast({
+            title: "Success",
+            description: "Conversation and transcript saved successfully",
+          });
+          return;
+        }
       }
 
-      // Save conversation to database
+      // Fallback: Save local messages if no BeyondPresence transcript
       const updateData: any = {
-        ended_at: new Date().toISOString()
-      };
-
-      // Use BeyondPresence data if available
-      if (studyData && studyData.transcript && studyData.transcript.length > 0) {
-        console.log('Using BeyondPresence transcript with', studyData.transcript.length, 'messages');
-        updateData.transcript = studyData.transcript;
-        if (studyData.flashcards) {
-          updateData.flashcards = studyData.flashcards;
-        }
-        if (studyData.analysis) {
-          updateData.analysis = studyData.analysis;
-        }
-      } else {
-        // Fallback to local messages if no external transcript available
-        console.log('Using fallback transcript from local messages');
-        updateData.transcript = messages.map(m => ({
+        ended_at: new Date().toISOString(),
+        transcript: messages.map(m => ({
           role: m.role,
           content: m.content,
           timestamp: m.timestamp.toISOString()
-        }));
-        updateData.analysis = "No AI analysis available for this conversation.";
-      }
+        })),
+        analysis: "No AI analysis available for this conversation.",
+        flashcards: []
+      };
 
-      console.log('Saving conversation with:', {
-        conversationId,
-        transcriptLength: updateData.transcript.length,
-        hasAnalysis: !!updateData.analysis,
-        flashcardsCount: updateData.flashcards?.length || 0
-      });
+      console.log('[TRACE] Saving conversation with local transcript');
 
       const { error } = await supabase
         .from("conversations")
@@ -390,18 +360,12 @@ const Conversation = () => {
 
       if (error) throw error;
 
-      // Store study data in sessionStorage for the StudyView
-      if (studyData) {
-        sessionStorage.setItem('studyData', JSON.stringify(studyData));
-      }
-      
-      // Always navigate to study view after saving conversation
-      console.log('Conversation saved, navigating to study page');
+      // Navigate to study view
+      navigate(`/study?conversationId=${conversationId}`);
       toast({
         title: "Success",
         description: "Conversation saved successfully",
       });
-      navigate('/study');
     } catch (error) {
       console.error("Error ending conversation:", error);
       toast({
