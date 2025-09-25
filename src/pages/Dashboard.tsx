@@ -33,6 +33,8 @@ interface Conversation {
     content: string;
     timestamp: string;
   }>;
+  flashcards?: any[];
+  analysis?: string;
 }
 
 const Dashboard = () => {
@@ -65,14 +67,19 @@ const Dashboard = () => {
         console.error("Error fetching conversations:", error);
       } else {
         // Type cast the transcript field properly
-        const typedConversations: Conversation[] = (data || []).map(conv => ({
-          ...conv,
-          transcript: conv.transcript as Array<{
-            role: "user" | "assistant";
-            content: string;
-            timestamp: string;
-          }>
-        }));
+        const typedConversations: Conversation[] = (data || []).map(conv => {
+          const conversationData = conv as any;
+          return {
+            ...conv,
+            transcript: conv.transcript as Array<{
+              role: "user" | "assistant";
+              content: string;
+              timestamp: string;
+            }>,
+            flashcards: conversationData.flashcards as any[],
+            analysis: conversationData.analysis as string
+          };
+        });
         setRecentConversations(typedConversations);
       }
     } catch (error) {
@@ -249,13 +256,18 @@ const Dashboard = () => {
                             .map((conversation) => (
                               <div
                                 key={conversation.id}
-                                className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
-                                onClick={() => setSelectedConversation(conversation)}
+                                className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                               >
-                                <div className="flex-1">
+                                <div 
+                                  className="flex-1 cursor-pointer"
+                                  onClick={() => setSelectedConversation(conversation)}
+                                >
                                   <div className="flex items-center gap-2 mb-1">
                                     <MessageSquare className="h-4 w-4 text-muted-foreground" />
                                     <p className="font-medium text-sm">{conversation.topic}</p>
+                                    {conversation.flashcards && conversation.flashcards.length > 0 && (
+                                      <BookOpen className="h-3 w-3 text-primary" />
+                                    )}
                                   </div>
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <User className="h-3 w-3" />
@@ -265,9 +277,25 @@ const Dashboard = () => {
                                     <span>{format(new Date(conversation.created_at), "MMM d, yyyy")}</span>
                                   </div>
                                 </div>
-                                <Badge variant="outline" className="text-xs">
-                                  {conversation.skill_level}
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  {conversation.flashcards && conversation.flashcards.length > 0 && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/study?conversationId=${conversation.id}`);
+                                      }}
+                                      className="text-xs"
+                                    >
+                                      <BookOpen className="h-3 w-3 mr-1" />
+                                      Study
+                                    </Button>
+                                  )}
+                                  <Badge variant="outline" className="text-xs">
+                                    {conversation.skill_level}
+                                  </Badge>
+                                </div>
                               </div>
                             ))}
                           

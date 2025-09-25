@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { BookOpen, Download, Play, ArrowLeft, Volume2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { elevenlabsClient, type FlashCard, type AgentResponse } from "@/services/elevenlabsClient";
+import { supabase } from "@/integrations/supabase/client";
 
 const StudyView = () => {
   const [searchParams] = useSearchParams();
@@ -17,19 +18,62 @@ const StudyView = () => {
   const [audioUrls, setAudioUrls] = useState<{[key: string]: string}>({});
 
   useEffect(() => {
-    // In a real implementation, this would come from the agent response
-    // For now, we'll use mock data or get it from sessionStorage if available
-    const storedData = sessionStorage.getItem('studyData');
-    if (storedData) {
-      try {
-        const parsedData = JSON.parse(storedData);
-        setStudyData(parsedData);
-        setLoading(false);
-        return;
-      } catch (error) {
-        console.error('Error parsing stored study data:', error);
+    const loadStudyData = async () => {
+      const conversationId = searchParams.get('conversationId');
+      
+      // If we have a conversation ID, load from database
+      if (conversationId) {
+        try {
+          const { data, error } = await supabase
+            .from('conversations')
+            .select('*')
+            .eq('id', conversationId)
+            .single();
+            
+          if (error) throw error;
+          
+          // Type cast the data properly
+          const conversationData = data as any;
+          const flashcards = conversationData.flashcards as any[];
+          const transcript = data.transcript as Array<{
+            role: "user" | "assistant";
+            content: string;
+            timestamp: string;
+          }>;
+          const analysis = conversationData.analysis as string;
+          
+          if (flashcards && flashcards.length > 0) {
+            const studyData: AgentResponse = {
+              transcript: transcript || [],
+              flashcards: flashcards,
+              analysis: analysis
+            };
+            setStudyData(studyData);
+            setLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error loading conversation data:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load study data",
+            variant: "destructive"
+          });
+        }
       }
-    }
+      
+      // Fallback to sessionStorage (from conversation flow)
+      const storedData = sessionStorage.getItem('studyData');
+      if (storedData) {
+        try {
+          const parsedData = JSON.parse(storedData);
+          setStudyData(parsedData);
+          setLoading(false);
+          return;
+        } catch (error) {
+          console.error('Error parsing stored study data:', error);
+        }
+      }
 
     // Fallback to mock data
     const mockStudyData: AgentResponse = {
@@ -80,9 +124,13 @@ const StudyView = () => {
       analysis: "Session completed successfully. Identified 3 key business terms for study."
     };
 
-    setStudyData(mockStudyData);
-    setLoading(false);
-  }, []);
+      // If no data found anywhere, show fallback
+      setStudyData(mockStudyData);
+      setLoading(false);
+    };
+    
+    loadStudyData();
+  }, [searchParams]);
 
   const playAudio = async (text: string, type: 'term' | 'example', index: number) => {
     const audioKey = `${index}-${type}`;
