@@ -4,7 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Mic, MicOff, ArrowLeft, Save, Video } from "lucide-react";
+import { Mic, MicOff, ArrowLeft, Save, Video, AlertCircle } from "lucide-react";
+import { useTranscriptRecorder } from "@/hooks/useTranscriptRecorder";
+import { elevenlabsClient } from "@/services/elevenlabsClient";
+import { ConsentModal } from "@/components/ConsentModal";
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -19,46 +23,59 @@ const Conversation = () => {
   const persona = searchParams.get("persona") || "";
   const skillLevel = searchParams.get("level") || "B1";
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isRecording, setIsRecording] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [elevenlabsSessionId, setElevenlabsSessionId] = useState<string | null>(null);
   
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   
+  // Consent and recording states
+  const [showConsentModal, setShowConsentModal] = useState(true);
+  const [recordingEnabled, setRecordingEnabled] = useState(false);
+  const [backgroundRecordingActive, setBackgroundRecordingActive] = useState(false);
+
+  // Background transcript recorder
+  const transcriptRecorder = useTranscriptRecorder(
+    async (audioChunk: Blob) => {
+      if (elevenlabsSessionId && recordingEnabled) {
+        await elevenlabsClient.streamAudio(audioChunk);
+      }
+    },
+    5000 // 5 second chunks
+  );
+
   useEffect(() => {
     checkAuth();
     startConversation();
   }, []);
+
+  useEffect(() => {
+    // Auto-start background recording when enabled and consent given
+    if (recordingEnabled && !backgroundRecordingActive && !showConsentModal) {
+      startBackgroundRecording();
+    }
+  }, [recordingEnabled, showConsentModal]);
+
   const checkAuth = async () => {
-    const {
-      data: {
-        user
-      }
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       navigate("/auth");
     }
   };
+
   const startConversation = async () => {
     try {
-      const {
-        data: {
-          user
-        }
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const {
-        data,
-        error
-      } = await supabase.from("conversations").insert({
+
+      const { data, error } = await supabase.from("conversations").insert({
         user_id: user.id,
         topic: topic,
         ai_persona: persona,
         skill_level: skillLevel as "A1" | "A2" | "B1" | "B2" | "C1" | "C2",
         transcript: []
       }).select().single();
+
       if (error) throw error;
       setConversationId(data.id);
 
@@ -79,6 +96,61 @@ const Conversation = () => {
       });
     }
   };
+
+  const startBackgroundRecording = async () => {
+    try {
+      // Start ElevenLabs session first
+      const sessionId = await elevenlabsClient.startSession(
+        "agent_2901k609n6fremxtqcaxw45412t1", // From the requirements
+        "1" // Voice ID from requirements
+      );
+      setElevenlabsSessionId(sessionId);
+
+      // Start transcript recording
+      await transcriptRecorder.startRecording();
+      setBackgroundRecordingActive(true);
+
+      console.log("Background recording started with ElevenLabs session:", sessionId);
+    } catch (error) {
+      console.error("Failed to start background recording:", error);
+      toast({
+        title: "Recording Error",
+        description: "Failed to start background recording",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const stopBackgroundRecording = () => {
+    transcriptRecorder.stopRecording();
+    setBackgroundRecordingActive(false);
+  };
+
+  const handleConsentAccept = async () => {
+    setRecordingEnabled(true);
+    setShowConsentModal(false);
+    
+    // Request permission first
+    const hasPermission = await transcriptRecorder.requestPermission();
+    if (!hasPermission) {
+      toast({
+        title: "Permission Denied",
+        description: "Microphone access is required for background recording",
+        variant: "destructive"
+      });
+      setRecordingEnabled(false);
+    }
+  };
+
+  const handleConsentDecline = () => {
+    setRecordingEnabled(false);
+    setShowConsentModal(false);
+    toast({
+      title: "Recording Disabled",
+      description: "You can enable recording in Settings later",
+    });
+  };
+
   const getInitialGreeting = () => {
     const greetings = {
       "hr-manager": "Hello! I'm the HR manager. Let's discuss the topic at hand.",
@@ -90,59 +162,13 @@ const Conversation = () => {
     };
     return greetings[persona as keyof typeof greetings] || "Hello! Let's begin our conversation.";
   };
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true
-      });
-      const recorder = new MediaRecorder(stream);
-      recorder.ondataavailable = event => {
-        if (event.data.size > 0) {
-          setAudioChunks(prev => [...prev, event.data]);
-        }
-      };
-      recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, {
-          type: 'audio/webm'
-        });
-        // Here you would normally send to a speech-to-text service
-        // For now, we'll just show a placeholder
-        toast({
-          title: "Recording stopped",
-          description: "Voice-to-text feature coming soon!"
-        });
-        setAudioChunks([]);
-      };
-      recorder.start();
-      setMediaRecorder(recorder);
-      setIsRecording(true);
-    } catch (error) {
-      console.error("Error accessing microphone:", error);
-      toast({
-        title: "Microphone access denied",
-        description: "Please allow microphone access to use voice input",
-        variant: "destructive"
-      });
-    }
-  };
-  const stopRecording = () => {
-    if (mediaRecorder && isRecording) {
-      mediaRecorder.stop();
-      mediaRecorder.stream.getTracks().forEach(track => track.stop());
-      setIsRecording(false);
-      setMediaRecorder(null);
-    }
-  };
+
   const startVideoCall = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: {
-            ideal: 1280
-          },
-          height: {
-            ideal: 720
-          }
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         },
         audio: true
       });
@@ -163,6 +189,7 @@ const Conversation = () => {
       });
     }
   };
+
   const stopVideoCall = () => {
     if (videoStream) {
       videoStream.getTracks().forEach(track => track.stop());
@@ -172,30 +199,42 @@ const Conversation = () => {
       }
     }
   };
-  const playAudioMessage = (content: string) => {
-    // Text-to-speech placeholder
-    const utterance = new SpeechSynthesisUtterance(content);
-    speechSynthesis.speak(utterance);
-  };
+
   const endConversation = async () => {
     if (!conversationId) return;
+
     try {
-      const {
-        error
-      } = await supabase.from("conversations").update({
-        transcript: messages.map(m => ({
+      // Stop background recording and get analysis
+      let studyData = null;
+      if (elevenlabsSessionId && recordingEnabled) {
+        stopBackgroundRecording();
+        studyData = await elevenlabsClient.endSession();
+      }
+
+      // Save conversation to database
+      const { error } = await supabase.from("conversations").update({
+        transcript: studyData?.transcript || messages.map(m => ({
           role: m.role,
           content: m.content,
           timestamp: m.timestamp.toISOString()
         })),
         ended_at: new Date().toISOString()
       }).eq("id", conversationId);
+
       if (error) throw error;
-      toast({
-        title: "Conversation saved",
-        description: "Your conversation has been saved successfully"
-      });
-      navigate("/dashboard");
+
+      // Navigate to study view if we have analysis data
+      if (studyData && studyData.flashcards.length > 0) {
+        // Store study data in sessionStorage for the StudyView
+        sessionStorage.setItem('studyData', JSON.stringify(studyData));
+        navigate('/study');
+      } else {
+        toast({
+          title: "Conversation saved",
+          description: "Your conversation has been saved successfully"
+        });
+        navigate("/dashboard");
+      }
     } catch (error) {
       console.error("Error ending conversation:", error);
       toast({
@@ -205,13 +244,24 @@ const Conversation = () => {
       });
     }
   };
+
   const formatTopic = (topicId: string) => {
     return topicId.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
   };
+
   const formatPersona = (personaId: string) => {
     return personaId.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
   };
-  return <div className="flex flex-col h-screen bg-background">
+
+  return (
+    <div className="flex flex-col h-screen bg-background">
+      {/* Consent Modal */}
+      <ConsentModal
+        open={showConsentModal}
+        onAccept={handleConsentAccept}
+        onDecline={handleConsentDecline}
+      />
+
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 py-3">
@@ -225,6 +275,12 @@ const Conversation = () => {
                 <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                   <span>with {formatPersona(persona)}</span>
                   <Badge variant="outline">{skillLevel}</Badge>
+                  {recordingEnabled && backgroundRecordingActive && (
+                    <Badge variant="secondary" className="flex items-center gap-1">
+                      <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
+                      Recording
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
@@ -234,6 +290,13 @@ const Conversation = () => {
             </Button>
           </div>
           
+          {/* Recording Status */}
+          {recordingEnabled && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-md">
+              <AlertCircle className="h-3 w-3" />
+              Background recording active for learning analytics
+            </div>
+          )}
         </div>
       </div>
 
@@ -242,10 +305,18 @@ const Conversation = () => {
         <div className="max-w-4xl mx-auto h-full">
           {/* AI Agent Video */}
           <div className="relative bg-muted rounded-lg overflow-hidden h-full">
-            <iframe src="https://bey.chat/59ee6a14-f254-4b87-9a8e-706a9e56abf7" className="w-full h-full rounded-lg" frameBorder="0" allowFullScreen allow="camera *; microphone *; autoplay *; encrypted-media *; fullscreen *" style={{
-              border: 'none',
-              minHeight: '500px'
-            }} title="AI Conversational Agent" />
+            <iframe 
+              src="https://bey.chat/59ee6a14-f254-4b87-9a8e-706a9e56abf7" 
+              className="w-full h-full rounded-lg" 
+              frameBorder="0" 
+              allowFullScreen 
+              allow="camera *; microphone *; autoplay *; encrypted-media *; fullscreen *" 
+              style={{
+                border: 'none',
+                minHeight: '500px'
+              }} 
+              title="AI Conversational Agent" 
+            />
             
             <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur px-3 py-1 rounded-md">
               <span className="text-sm font-medium">CEO</span>
@@ -258,10 +329,11 @@ const Conversation = () => {
       <div className="border-t bg-background p-4">
         <div className="max-w-3xl mx-auto">
           <div className="flex justify-center space-x-4">
-            <Button onClick={isRecording ? stopRecording : startRecording} variant={isRecording ? "destructive" : "outline"} size="icon">
-              {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            </Button>
-            <Button onClick={videoStream ? stopVideoCall : startVideoCall} variant={videoStream ? "destructive" : "outline"} size="icon">
+            <Button 
+              onClick={videoStream ? stopVideoCall : startVideoCall} 
+              variant={videoStream ? "destructive" : "outline"} 
+              size="icon"
+            >
               <Video className="h-4 w-4" />
             </Button>
             <div className="flex items-center space-x-2 px-3 py-2 bg-muted rounded-md">
@@ -270,9 +342,19 @@ const Conversation = () => {
                 {videoStream ? "Camera on" : "Camera off"}
               </span>
             </div>
+            {recordingEnabled && (
+              <div className="flex items-center space-x-2 px-3 py-2 bg-red-50 border border-red-200 rounded-md">
+                <div className={`h-2 w-2 rounded-full ${backgroundRecordingActive ? "bg-red-500 animate-pulse" : "bg-muted-foreground"}`}></div>
+                <span className="text-sm text-red-700">
+                  {backgroundRecordingActive ? "Learning analytics active" : "Recording stopped"}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default Conversation;
