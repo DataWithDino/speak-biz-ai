@@ -21,6 +21,40 @@ const StudyView = () => {
     const loadStudyData = async () => {
       const conversationId = searchParams.get('conversationId');
       
+      // Default practice flashcards that match the Dashboard
+      const defaultFlashcards: FlashCard[] = [
+        {
+          term: "synergy",
+          definition: "The interaction of two or more agents or forces so that their combined effect is greater than the sum of their individual effects.",
+          example_sentence: "The merger created synergy between the two companies' operations.",
+          german_translation: "Synergie",
+          common_mistake: "Using it to mean simple cooperation",
+          correction: "Use it when referring to combined efforts producing greater results",
+          cefr_level: "C1" as const,
+          topic_tag: "business_general"
+        },
+        {
+          term: "stakeholder",
+          definition: "A person with an interest or concern in something, especially a business.",
+          example_sentence: "We need to consider all stakeholders before making this decision.",
+          german_translation: "Interessenvertreter",
+          common_mistake: "Confusing with shareholder",
+          correction: "Stakeholder includes anyone affected, not just owners",
+          cefr_level: "B2" as const,
+          topic_tag: "business_general"
+        },
+        {
+          term: "quarterly review",
+          definition: "A formal assessment of performance or progress conducted every three months.",
+          example_sentence: "The quarterly review showed significant improvement in sales.",
+          german_translation: "Quartalsüberprüfung",
+          common_mistake: "Saying 'quarter review'",
+          correction: "Always use 'quarterly' as the adjective",
+          cefr_level: "B2" as const,
+          topic_tag: "meetings"
+        }
+      ];
+      
       // If we have a conversation ID, load from database
       if (conversationId) {
         try {
@@ -54,11 +88,6 @@ const StudyView = () => {
           }
         } catch (error) {
           console.error('Error loading conversation data:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load study data",
-            variant: "destructive"
-          });
         }
       }
       
@@ -67,65 +96,24 @@ const StudyView = () => {
       if (storedData) {
         try {
           const parsedData = JSON.parse(storedData);
-          setStudyData(parsedData);
-          setLoading(false);
-          return;
+          if (parsedData.flashcards && parsedData.flashcards.length > 0) {
+            setStudyData(parsedData);
+            setLoading(false);
+            return;
+          }
         } catch (error) {
           console.error('Error parsing stored study data:', error);
         }
       }
 
-    // Fallback to mock data
-    const mockStudyData: AgentResponse = {
-      transcript: [
-        {
-          role: "assistant",
-          content: "Good morning! I'm ready to discuss our quarterly results. How do you think the team performed this quarter?",
-          timestamp: new Date().toISOString()
-        },
-        {
-          role: "user", 
-          content: "I believe we've made good progress, especially in creating synergy between departments.",
-          timestamp: new Date().toISOString()
-        }
-      ],
-      flashcards: [
-        {
-          term: "synergy",
-          definition: "The interaction of two or more organizations to produce a combined effect greater than the sum of their separate effects",
-          example_sentence: "We need to create synergy between our departments.",
-          german_translation: "Synergie",
-          common_mistake: "Using 'synergy' when you mean simple cooperation",
-          correction: "Use 'synergy' only when describing enhanced combined effects",
-          cefr_level: "C1",
-          topic_tag: "business_strategy"
-        },
-        {
-          term: "stakeholder",
-          definition: "A person or organization that has an interest in or is affected by a business decision",
-          example_sentence: "All stakeholders must approve this proposal.",
-          german_translation: "Interessenvertreter",
-          common_mistake: "Confusing 'stakeholder' with 'shareholder'",
-          correction: "Stakeholders include anyone affected; shareholders own stock",
-          cefr_level: "B2",
-          topic_tag: "business_management"
-        },
-        {
-          term: "quarterly review",
-          definition: "A regular assessment of performance and progress conducted every three months",
-          example_sentence: "Our quarterly review showed strong growth.",
-          german_translation: "Quartalsbericht",
-          common_mistake: "Saying 'quarter review' instead of 'quarterly review'",
-          correction: "Use 'quarterly' (adjective) not 'quarter' (noun)",
-          cefr_level: "B1",
-          topic_tag: "business_reporting"
-        }
-      ],
-      analysis: "Session completed successfully. Identified 3 key business terms for study."
-    };
+      // Use default practice data
+      const defaultStudyData: AgentResponse = {
+        transcript: [],
+        flashcards: defaultFlashcards,
+        analysis: "Practice session for improving your business English vocabulary. These flashcards cover essential business terms."
+      };
 
-      // If no data found anywhere, show fallback
-      setStudyData(mockStudyData);
+      setStudyData(defaultStudyData);
       setLoading(false);
     };
     
