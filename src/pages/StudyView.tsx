@@ -229,37 +229,77 @@ const StudyView = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center space-x-4">
+          <div className="mb-10">
+            {/* Navigation Bar */}
+            <div className="mb-6">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => navigate('/dashboard')}
+                className="hover:bg-accent/10 transition-all"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Dashboard
               </Button>
-                <div>
-                  <h1 className="text-3xl font-bold flex items-center space-x-2">
-                    <BookOpen className="h-8 w-8 text-primary" />
-                    <span>Your Learning Environment</span>
-                  </h1>
-                  <p className="text-muted-foreground mt-1">
-                    Master your mistakes and improve your business English
-                  </p>
+            </div>
+
+            {/* Main Header Card */}
+            <Card className="border-none shadow-lg bg-gradient-to-r from-card to-accent/5">
+              <CardContent className="p-8">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                  {/* Title Section */}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-4 mb-3">
+                      <div className="p-3 rounded-xl bg-primary/10 shadow-inner">
+                        <BookOpen className="h-8 w-8 text-primary" />
+                      </div>
+                      <div>
+                        <h1 className="text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                          Your Learning Environment
+                        </h1>
+                        <p className="text-muted-foreground mt-1 text-lg">
+                          Master your mistakes and improve your business English
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Stats or progress indicators could go here */}
+                    <div className="flex gap-4 mt-4">
+                      {studyData?.flashcards && (
+                        <>
+                          <Badge variant="secondary" className="px-3 py-1">
+                            {studyData.flashcards.length} Flashcards
+                          </Badge>
+                          <Badge variant="outline" className="px-3 py-1">
+                            Practice Mode
+                          </Badge>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button 
+                      variant="outline" 
+                      onClick={exportCSV}
+                      className="hover:bg-accent/10 transition-all group"
+                    >
+                      <Download className="h-4 w-4 mr-2 group-hover:translate-y-0.5 transition-transform" />
+                      Export CSV
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={exportAnki}
+                      className="hover:bg-accent/10 transition-all group"
+                    >
+                      <Download className="h-4 w-4 mr-2 group-hover:translate-y-0.5 transition-transform" />
+                      Anki Format
+                    </Button>
+                  </div>
                 </div>
-            </div>
-            
-            <div className="flex space-x-2">
-              <Button variant="outline" onClick={exportCSV}>
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
-              <Button variant="outline" onClick={exportAnki}>
-                <Download className="h-4 w-4 mr-2" />
-                Export Anki TSV
-              </Button>
-            </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Analysis Summary */}
