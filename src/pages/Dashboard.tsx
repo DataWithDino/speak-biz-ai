@@ -188,17 +188,22 @@ const Dashboard = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-gradient-to-br from-primary/5 to-secondary/5">
+      <div className="min-h-screen flex w-full bg-background grid-pattern">
         <AppSidebar />
         
         <div className="flex-1 flex flex-col">
-          <header className="h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center px-4">
+          <header className="h-14 border-b bg-background/80 backdrop-blur-md flex items-center px-4">
             <SidebarTrigger className="mr-4">
               <Menu className="h-5 w-5" />
             </SidebarTrigger>
-            <div className="flex items-center space-x-2">
-              <BookOpen className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-bold">BizEnglishAI</h1>
+            <div className="flex items-center space-x-3">
+              <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-glow">
+                <BookOpen className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">BizEnglishAI</h1>
+                <p className="text-xs text-muted-foreground">Professional Dashboard</p>
+              </div>
             </div>
           </header>
 
@@ -208,10 +213,12 @@ const Dashboard = () => {
                 
                 {/* Start Conversation Card */}
                 <div id="conversation">
-                  <Card className="border-primary">
+                  <Card className="border-primary/20 bg-gradient-to-br from-card to-card/80 card-hover">
                     <CardHeader>
                       <CardTitle className="flex items-center space-x-2">
-                        <MessageSquare className="h-6 w-6" />
+                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+                          <MessageSquare className="h-5 w-5 text-primary-foreground" />
+                        </div>
                         <span>Practice Conversations</span>
                       </CardTitle>
                       <CardDescription>
@@ -220,11 +227,11 @@ const Dashboard = () => {
                     </CardHeader>
                     <CardContent className="flex justify-center py-8">
                       <Button 
-                        size="lg" 
-                        className="px-8 py-6 text-lg"
+                        variant="professional"
+                        size="xl" 
                         onClick={() => setShowSetup(true)}
                       >
-                        <MessageSquare className="h-6 w-6 mr-3" />
+                        <MessageSquare className="h-5 w-5 mr-2" />
                         Start New Conversation
                       </Button>
                     </CardContent>
