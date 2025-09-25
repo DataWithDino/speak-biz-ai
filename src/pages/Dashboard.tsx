@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User, BookOpen, LogOut, MessageSquare, Menu, Activity, Calendar, Clock, ChevronLeft, ChevronRight, Volume2, X } from "lucide-react";
+import { User, BookOpen, LogOut, MessageSquare, Menu, Activity, Calendar, Clock, ChevronLeft, ChevronRight, Volume2, X, Check, Globe } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ConversationSetup from "@/components/ConversationSetup";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -582,99 +582,134 @@ const Dashboard = () => {
       {/* Pronunciation Practice Modal */}
       {selectedFlashcard && (
         <Dialog open={!!selectedFlashcard} onOpenChange={() => setSelectedFlashcard(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold text-primary flex items-center justify-between">
-                <span>{selectedFlashcard.term}</span>
-                <button
-                  onClick={() => setSelectedFlashcard(null)}
-                  className="p-1 rounded-md hover:bg-secondary/20 transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </DialogTitle>
-            </DialogHeader>
-            
-            <div className="space-y-6 mt-4">
-              {/* Pronunciation Section - Most Important */}
-              <div className="bg-gradient-to-r from-primary/10 to-secondary/10 p-6 rounded-lg border border-primary/20">
-                <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                  <Volume2 className="h-5 w-5 text-primary" />
-                  Pronunciation Practice
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="default"
-                      size="lg"
-                      onClick={() => playPronunciation(selectedFlashcard.term)}
-                      disabled={audioLoading}
-                      className="flex-1"
-                    >
-                      {audioLoading ? (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      ) : (
-                        <>
-                          <Volume2 className="h-5 w-5 mr-2" />
-                          Play Term
-                        </>
-                      )}
-                    </Button>
-                    <span className="text-lg italic text-muted-foreground">
-                      {selectedFlashcard.term === "synergy" && "SIN-er-jee"}
-                      {selectedFlashcard.term === "stakeholder" && "STAKE-hohl-der"}
-                      {selectedFlashcard.term === "quarterly review" && "KWAR-ter-lee ree-VYOO"}
-                    </span>
-                  </div>
-                  
-                  <div className="mt-4 p-4 bg-background rounded-md border">
-                    <p className="font-medium mb-2">Example Sentence:</p>
-                    <p className="italic text-muted-foreground mb-3">"{selectedFlashcard.example_sentence}"</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => playPronunciation(selectedFlashcard.example_sentence)}
-                      disabled={audioLoading}
-                    >
-                      <Volume2 className="h-4 w-4 mr-2" />
-                      Play Example
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Definition */}
-              <div>
-                <h3 className="font-semibold mb-2">Definition:</h3>
-                <p className="text-muted-foreground">{selectedFlashcard.definition}</p>
-              </div>
-
-              {/* Common Mistakes */}
-              <div className="bg-gradient-to-r from-red-50 to-green-50 dark:from-red-950/20 dark:to-green-950/20 p-4 rounded-lg border">
-                <h3 className="font-semibold mb-3">Learn from Common Mistakes:</h3>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="bg-destructive/5 border border-destructive/20 p-3 rounded-md">
-                    <h4 className="font-medium text-sm text-destructive mb-1">❌ Avoid:</h4>
-                    <p className="text-sm italic">{selectedFlashcard.common_mistake}</p>
-                  </div>
-                  <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/50 p-3 rounded-md">
-                    <h4 className="font-medium text-sm text-green-700 dark:text-green-400 mb-1">✓ Correct:</h4>
-                    <p className="text-sm font-medium">{selectedFlashcard.correction}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Additional Info */}
-              <div className="flex items-center justify-between pt-2">
-                <div className="flex gap-2">
-                  <Badge variant="secondary">{selectedFlashcard.cefr_level}</Badge>
-                  <Badge variant="outline">{selectedFlashcard.topic_tag.replace('_', ' ')}</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-medium">German:</span> {selectedFlashcard.german_translation}
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0 animate-scale-in">
+            {/* Header with gradient background */}
+            <div className="bg-gradient-to-r from-primary to-primary/80 p-6 pb-8 relative">
+              <button
+                onClick={() => setSelectedFlashcard(null)}
+                className="absolute top-4 right-4 p-2 rounded-full bg-white/10 backdrop-blur hover:bg-white/20 transition-all hover:scale-110"
+              >
+                <X className="h-5 w-5 text-white" />
+              </button>
+              
+              <div className="text-center text-white">
+                <h2 className="text-4xl font-bold mb-2 animate-fade-in">
+                  {selectedFlashcard.term}
+                </h2>
+                <p className="text-xl opacity-90 italic">
+                  {selectedFlashcard.term === "synergy" && "SIN-er-jee"}
+                  {selectedFlashcard.term === "stakeholder" && "STAKE-hohl-der"}
+                  {selectedFlashcard.term === "quarterly review" && "KWAR-ter-lee ree-VYOO"}
                 </p>
+                <div className="flex gap-2 justify-center mt-3">
+                  <Badge className="bg-white/20 backdrop-blur text-white border-white/30">
+                    {selectedFlashcard.cefr_level}
+                  </Badge>
+                  <Badge className="bg-white/20 backdrop-blur text-white border-white/30">
+                    {selectedFlashcard.topic_tag.replace('_', ' ')}
+                  </Badge>
+                </div>
               </div>
             </div>
+            
+            <ScrollArea className="max-h-[calc(90vh-120px)]">
+              <div className="p-6 space-y-6">
+                {/* Main Pronunciation Section */}
+                <div className="bg-gradient-to-br from-primary/5 via-secondary/5 to-primary/5 p-6 rounded-xl border border-primary/10 animate-fade-in">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 rounded-full bg-primary/10">
+                      <Volume2 className="h-6 w-6 text-primary" />
+                    </div>
+                    <h3 className="font-semibold text-lg">Practice Pronunciation</h3>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {/* Term pronunciation */}
+                    <div className="flex gap-3">
+                      <Button
+                        variant="default"
+                        size="lg"
+                        onClick={() => playPronunciation(selectedFlashcard.term)}
+                        disabled={audioLoading}
+                        className="flex-1 h-14 text-lg font-medium hover:scale-105 transition-transform"
+                      >
+                        {audioLoading ? (
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        ) : (
+                          <>
+                            <Volume2 className="h-6 w-6 mr-3" />
+                            Listen to Pronunciation
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    
+                    {/* Example sentence */}
+                    <div className="bg-background/60 backdrop-blur p-5 rounded-lg border">
+                      <p className="text-sm font-medium text-muted-foreground mb-2">Example in context:</p>
+                      <p className="text-lg italic mb-4">"{selectedFlashcard.example_sentence}"</p>
+                      <Button
+                        variant="outline"
+                        size="default"
+                        onClick={() => playPronunciation(selectedFlashcard.example_sentence)}
+                        disabled={audioLoading}
+                        className="hover:scale-105 transition-transform"
+                      >
+                        <Volume2 className="h-4 w-4 mr-2" />
+                        Play Full Sentence
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Definition Card */}
+                <div className="bg-gradient-to-r from-secondary/10 to-secondary/5 p-5 rounded-lg border border-secondary/20 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <BookOpen className="h-5 w-5 text-secondary" />
+                    Definition
+                  </h3>
+                  <p className="text-foreground/80 leading-relaxed">{selectedFlashcard.definition}</p>
+                </div>
+
+                {/* Common Mistakes Section - Visual Improvement */}
+                <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                  <h3 className="font-semibold mb-4 flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-primary" />
+                    Learn from Common Mistakes
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-gradient-to-br from-destructive/10 to-destructive/5 p-5 rounded-lg border-2 border-destructive/20 hover:border-destructive/30 transition-colors">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="h-8 w-8 rounded-full bg-destructive/10 flex items-center justify-center">
+                          <X className="h-5 w-5 text-destructive" />
+                        </div>
+                        <h4 className="font-semibold text-destructive">Common Mistake</h4>
+                      </div>
+                      <p className="text-sm italic text-foreground/70">"{selectedFlashcard.common_mistake}"</p>
+                    </div>
+                    
+                    <div className="bg-gradient-to-br from-green-500/10 to-green-500/5 p-5 rounded-lg border-2 border-green-500/20 hover:border-green-500/30 transition-colors">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="h-8 w-8 rounded-full bg-green-500/10 flex items-center justify-center">
+                          <Check className="h-5 w-5 text-green-600 dark:text-green-500" />
+                        </div>
+                        <h4 className="font-semibold text-green-700 dark:text-green-400">Correct Usage</h4>
+                      </div>
+                      <p className="text-sm font-medium text-foreground/80">"{selectedFlashcard.correction}"</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Translation */}
+                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border animate-fade-in" style={{ animationDelay: '0.3s' }}>
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-sm font-medium text-muted-foreground">German Translation:</span>
+                  </div>
+                  <span className="font-semibold text-foreground">{selectedFlashcard.german_translation}</span>
+                </div>
+              </div>
+            </ScrollArea>
           </DialogContent>
         </Dialog>
       )}
