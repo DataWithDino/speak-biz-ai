@@ -99,26 +99,19 @@ const Conversation = () => {
 
   const startBackgroundRecording = async () => {
     try {
-      // Start ElevenLabs session using our edge function
-      const { data, error } = await supabase.functions.invoke('elevenlabs-agent', {
-        body: { 
-          action: 'start',
-          agentId: "agent_2901k609n6fremxtqcaxw45412t1",
-          voiceId: "1"
-        }
-      });
+      // Start ElevenLabs session using the client
+      const sessionId = await elevenlabsClient.startSession(
+        "agent_2901k609n6fremxtqcaxw45412t1",
+        "1"
+      );
 
-      if (error || !data?.sessionId) {
-        throw new Error(error?.message || 'Failed to start ElevenLabs session');
-      }
-
-      setElevenlabsSessionId(data.sessionId);
+      setElevenlabsSessionId(sessionId);
 
       // Start transcript recording
       await transcriptRecorder.startRecording();
       setBackgroundRecordingActive(true);
 
-      console.log("Background recording started with ElevenLabs session:", data.sessionId);
+      console.log("Background recording started with ElevenLabs session:", sessionId);
     } catch (error) {
       console.error("Failed to start background recording:", error);
       toast({
@@ -133,10 +126,14 @@ const Conversation = () => {
     try {
       let agentResponse = null;
       
-      if (elevenlabsSessionId) {
+      // Use the elevenlabsClient to properly end the session
+      if (elevenlabsClient.isActive()) {
+        console.log('Ending ElevenLabs session...');
         agentResponse = await elevenlabsClient.endSession();
-        setElevenlabsSessionId(null);
         console.log('ElevenLabs session ended with response:', agentResponse);
+        setElevenlabsSessionId(null);
+      } else {
+        console.warn('No active ElevenLabs session to end');
       }
       
       transcriptRecorder.stopRecording();
@@ -146,7 +143,20 @@ const Conversation = () => {
       return agentResponse;
     } catch (error) {
       console.error('Error stopping background recording:', error);
-      return null;
+      // Reset state even on error
+      setElevenlabsSessionId(null);
+      setBackgroundRecordingActive(false);
+      
+      // Return a fallback response with minimal data
+      return {
+        transcript: messages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp.toISOString()
+        })),
+        flashcards: [],
+        analysis: "Session ended with an error. Please try again."
+      };
     }
   };
 
@@ -228,36 +238,23 @@ const Conversation = () => {
     if (!conversationId) return;
 
     try {
-      // Stop background recording and get analysis
-      let studyData = null;
-      if (elevenlabsSessionId && recordingEnabled) {
-        // Call our edge function to end the ElevenLabs session and get transcript
-        try {
-          const { data, error } = await supabase.functions.invoke('elevenlabs-agent', {
-            body: { 
-              action: 'end',
-              sessionId: elevenlabsSessionId
-            }
-          });
-          
-          if (error) {
-            console.error('Failed to end ElevenLabs session:', error);
-          } else {
-            studyData = data;
-            console.log('ElevenLabs session ended with data:', studyData);
-          }
-        } catch (error) {
-          console.error('Error calling end session:', error);
-        }
-        
-        setElevenlabsSessionId(null);
-        transcriptRecorder.stopRecording();
-        setBackgroundRecordingActive(false);
-      }
-
       // Stop video call if active
       if (videoStream) {
         stopVideoCall();
+      }
+
+      // Stop background recording and get analysis
+      let studyData = null;
+      if (elevenlabsClient.isActive() && recordingEnabled) {
+        console.log('Ending ElevenLabs session to get transcript...');
+        try {
+          studyData = await stopBackgroundRecording();
+          console.log('Received study data from ElevenLabs:', studyData);
+        } catch (error) {
+          console.error('Error stopping background recording:', error);
+        }
+      } else {
+        console.log('No active ElevenLabs session or recording disabled');
       }
 
       // Save conversation to database
@@ -266,7 +263,8 @@ const Conversation = () => {
       };
 
       // Include transcript and analysis if available from ElevenLabs
-      if (studyData && studyData.transcript) {
+      if (studyData && studyData.transcript && studyData.transcript.length > 0) {
+        console.log('Using ElevenLabs transcript with', studyData.transcript.length, 'messages');
         updateData.transcript = studyData.transcript;
         if (studyData.flashcards) {
           updateData.flashcards = studyData.flashcards;
@@ -276,12 +274,21 @@ const Conversation = () => {
         }
       } else {
         // Fallback to conversation messages if no ElevenLabs data
+        console.log('Using fallback transcript from local messages');
         updateData.transcript = messages.map(m => ({
           role: m.role,
           content: m.content,
           timestamp: m.timestamp.toISOString()
         }));
+        updateData.analysis = "No AI analysis available for this conversation.";
       }
+
+      console.log('Saving conversation with:', {
+        conversationId,
+        transcriptLength: updateData.transcript.length,
+        hasAnalysis: !!updateData.analysis,
+        flashcardsCount: updateData.flashcards?.length || 0
+      });
 
       const { error } = await supabase
         .from("conversations")
@@ -290,15 +297,18 @@ const Conversation = () => {
 
       if (error) throw error;
 
-      // Always navigate to study view after saving conversation
-      if (studyData && studyData.flashcards && studyData.flashcards.length > 0) {
-        // Store study data in sessionStorage for the StudyView
+      // Store study data in sessionStorage for the StudyView
+      if (studyData) {
         sessionStorage.setItem('studyData', JSON.stringify(studyData));
-        navigate('/study');
-      } else {
-        // Even without flashcards, navigate to study page - it will show analysis
-        navigate('/study');
       }
+      
+      // Always navigate to study view after saving conversation
+      console.log('Conversation saved, navigating to study page');
+      toast({
+        title: "Success",
+        description: "Conversation saved successfully",
+      });
+      navigate('/study');
     } catch (error) {
       console.error("Error ending conversation:", error);
       toast({
@@ -306,6 +316,8 @@ const Conversation = () => {
         description: "Failed to save conversation",
         variant: "destructive"
       });
+      // Still navigate even on error
+      navigate('/study');
     }
   };
 
