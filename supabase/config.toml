@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.elevenlabs-agent]
 verify_jwt = true
+
+[functions.generate-transcript]
+verify_jwt = true

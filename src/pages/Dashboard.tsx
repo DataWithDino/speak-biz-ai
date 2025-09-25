@@ -18,15 +18,53 @@ interface Profile {
   email: string;
 }
 
+interface Conversation {
+  id: string;
+  topic: string;
+  ai_persona: string;
+  skill_level: SkillLevel;
+  created_at: string;
+  ended_at: string | null;
+  transcript: Array<{
+    role: "user" | "assistant";
+    content: string;
+    timestamp: string;
+  }>;
+}
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSetup, setShowSetup] = useState(false);
+  const [recentConversations, setRecentConversations] = useState<Conversation[]>([]);
 
   useEffect(() => {
     fetchProfile();
+    fetchRecentConversations();
   }, []);
+
+  const fetchRecentConversations = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (error) {
+        console.error("Error fetching conversations:", error);
+      } else {
+        setRecentConversations(data || []);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
 
   const fetchProfile = async () => {
     try {
