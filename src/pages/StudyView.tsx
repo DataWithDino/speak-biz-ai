@@ -24,24 +24,24 @@ const StudyView = () => {
       // Default practice flashcards that match the Dashboard
       const defaultFlashcards: FlashCard[] = [
         {
-          term: "synergy",
-          definition: "The interaction of two or more agents or forces so that their combined effect is greater than the sum of their individual effects.",
-          example_sentence: "The merger created synergy between the two companies' operations.",
-          german_translation: "Synergie",
-          common_mistake: "Using it to mean simple cooperation",
-          correction: "Use it when referring to combined efforts producing greater results",
+          term: "projection shortfall",
+          definition: "The difference between expected (projected) results and actual achieved results",
+          example_sentence: "Our company made twenty million US dollars this quarter; however, we fell short of our projection by ten million US dollars.",
+          german_translation: "Prognosefehlbetrag",
+          common_mistake: "Using 'projection' and 'prediction' interchangeably",
+          correction: "Projection is a calculated estimate; prediction is a general forecast",
           cefr_level: "C1" as const,
-          topic_tag: "business_general"
+          topic_tag: "business_reporting"
         },
         {
-          term: "stakeholder",
-          definition: "A person with an interest or concern in something, especially a business.",
-          example_sentence: "We need to consider all stakeholders before making this decision.",
-          german_translation: "Interessenvertreter",
-          common_mistake: "Confusing with shareholder",
-          correction: "Stakeholder includes anyone affected, not just owners",
+          term: "acquiring",
+          definition: "The process of obtaining or gaining possession of something, especially through purchase or merger",
+          example_sentence: "We are currently acquiring two smaller companies to expand our market share.",
+          german_translation: "erwerben / akquirieren",
+          common_mistake: "Confusing 'acquiring' with 'requiring'",
+          correction: "Acquiring means obtaining; requiring means needing",
           cefr_level: "B2" as const,
-          topic_tag: "business_general"
+          topic_tag: "business_strategy"
         },
         {
           term: "quarterly review",
