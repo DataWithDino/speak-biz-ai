@@ -13,18 +13,8 @@ interface ActiveSession {
   startTime: number;
   agentId: string;
   conversationId: string;
-  elevenlabsConversationId: string;
+  signedUrl: string;
   lastActivity: number;
-  audioChunks: Array<{
-    data: string;
-    timestamp: number;
-    mimeType: string;
-  }>;
-  transcript: Array<{
-    role: string;
-    content: string;
-    timestamp: string;
-  }>;
 }
 
 // Store active sessions
@@ -205,15 +195,51 @@ async function handleStart(agentId: string, voiceId: string, apiKey: string) {
     // Create a unique session ID for tracking
     const sessionId = crypto.randomUUID();
     
-    // Create session and store it for tracking audio and conversation data
+    // Get a signed URL for the conversation with proper headers
+    console.log(`[TRACE] Getting signed URL for ElevenLabs agent: ${agentId}`);
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${agentId}`,
+      {
+        method: "GET",
+        headers: {
+          "xi-api-key": apiKey,
+          "Accept": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[TRACE] ElevenLabs API error:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
+      
+      if (response.status === 404) {
+        throw new Error(`Agent not found. Please verify agent ID: ${agentId} is correct and the agent is properly configured in ElevenLabs dashboard.`);
+      } else if (response.status === 401) {
+        throw new Error('Invalid API key. Please check your ElevenLabs API key.');
+      }
+      
+      throw new Error(`Failed to get signed URL: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log(`[TRACE] Successfully got signed URL for conversation`);
+
+    if (!data.signed_url) {
+      console.error(`[TRACE] Invalid response structure:`, data);
+      throw new Error('Invalid response from ElevenLabs API - missing signed_url');
+    }
+    
+    // Create session and store it for tracking
     const session: ActiveSession = {
       startTime: Date.now(),
       agentId,
       conversationId: sessionId,
-      elevenlabsConversationId: `conv_${sessionId}`, // Generate a conversation ID for tracking
+      signedUrl: data.signed_url,
       lastActivity: Date.now(),
-      audioChunks: [],
-      transcript: []
     };
     
     console.log(`[TRACE] Creating session for agent: ${agentId}`);
@@ -226,8 +252,8 @@ async function handleStart(agentId: string, voiceId: string, apiKey: string) {
     return new Response(
       JSON.stringify({ 
         sessionId, 
-        conversationId: session.elevenlabsConversationId,
-        status: 'ready' // Indicate session is ready for WebSocket connection
+        signedUrl: data.signed_url,
+        status: 'ready'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -247,35 +273,22 @@ async function handleStream(sessionId: string, audioData: string, mimeType: stri
       throw new Error('Invalid session ID');
     }
 
-    console.log(`[TRACE] Streaming audio to ElevenLabs conversation:`, {
-      sessionId,
-      elevenlabsConversationId: session.elevenlabsConversationId,
-      audioDataLength: audioData.length,
-      mimeType
-    });
-
-    // Store audio chunk with timestamp
-    session.audioChunks.push({
-      data: audioData,
-      timestamp: Date.now(),
-      mimeType: mimeType || 'audio/webm'
-    });
-
-    // Update session activity
+    // Update session activity - this is just for tracking, 
+    // actual audio streaming happens through ElevenLabs WebSocket
     session.lastActivity = Date.now();
-    console.log(`[TRACE] Stored audio chunk for session: ${sessionId}, total chunks: ${session.audioChunks.length}`);
+    console.log(`[TRACE] Updated session activity: ${sessionId}`);
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        chunksStored: session.audioChunks.length 
+        message: 'Session activity updated'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   } catch (error) {
-    console.error('[TRACE] Error streaming audio:', error);
+    console.error('[TRACE] Error updating session:', error);
     return new Response(
       JSON.stringify({ 
         success: false, 
@@ -303,15 +316,18 @@ async function handleEnd(sessionId: string, apiKey: string) {
 
     console.log(`[TRACE] Session duration: ${durationMinutes} minutes`);
 
-    // Try to get conversation data from ElevenLabs using the List Conversations endpoint
+    // Wait a moment for ElevenLabs to process the conversation
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     let transcript: any[] = [];
     let analysis = `Business English Learning Analysis\n\nSession Duration: ${durationMinutes} minutes\n\nReal-time conversation with ElevenLabs AI agent completed.`;
     let flashcards: any[] = [];
 
     try {
       // Get conversations from ElevenLabs API
+      console.log(`[TRACE] Fetching conversations for agent: ${session.agentId}`);
       const conversationsResponse = await fetch(
-        `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${session.agentId}`,
+        `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${session.agentId}&page_size=10`,
         {
           headers: {
             'xi-api-key': apiKey,
@@ -321,29 +337,68 @@ async function handleEnd(sessionId: string, apiKey: string) {
 
       if (conversationsResponse.ok) {
         const conversationsData = await conversationsResponse.json();
-        console.log('[TRACE] Retrieved conversations from ElevenLabs:', conversationsData);
+        console.log('[TRACE] Retrieved conversations from ElevenLabs:', {
+          count: conversationsData.conversations?.length || 0,
+          sessionStartTime: new Date(session.startTime).toISOString()
+        });
 
         // Find the most recent conversation that matches our timeframe
         const recentConversation = conversationsData.conversations?.find((conv: any) => {
-          const convTime = new Date(conv.start_time || conv.created_at).getTime();
-          const timeDiff = Math.abs(convTime - session.startTime);
+          const convStartTime = new Date(conv.start_time).getTime();
+          const timeDiff = Math.abs(convStartTime - session.startTime);
+          console.log(`[TRACE] Checking conversation:`, {
+            conversationId: conv.conversation_id,
+            startTime: conv.start_time,
+            timeDiff: `${timeDiff}ms`,
+            withinRange: timeDiff < 300000
+          });
           return timeDiff < 300000; // Within 5 minutes
         });
 
         if (recentConversation) {
-          console.log('[TRACE] Found matching conversation:', recentConversation);
+          console.log('[TRACE] Found matching conversation:', recentConversation.conversation_id);
           
-          // Extract transcript from the conversation
-          if (recentConversation.transcript) {
-            transcript = recentConversation.transcript.map((turn: any, index: number) => ({
-              role: turn.role || (turn.user_query ? 'user' : 'assistant'),
-              content: turn.user_query || turn.agent_response || turn.content || '',
-              timestamp: turn.timestamp || new Date(session.startTime + (index * 30000)).toISOString()
-            }));
+          // Get detailed conversation data including transcript
+          const detailResponse = await fetch(
+            `https://api.elevenlabs.io/v1/convai/conversations/${recentConversation.conversation_id}`,
+            {
+              headers: {
+                'xi-api-key': apiKey,
+              },
+            }
+          );
+
+          if (detailResponse.ok) {
+            const detailData = await detailResponse.json();
+            console.log('[TRACE] Retrieved conversation details:', {
+              hasTranscript: !!detailData.transcript,
+              transcriptLength: detailData.transcript?.length || 0,
+              hasAnalysis: !!detailData.analysis
+            });
+
+            // Extract transcript from the conversation
+            if (detailData.transcript && detailData.transcript.length > 0) {
+              transcript = detailData.transcript.map((turn: any, index: number) => ({
+                role: turn.role || (turn.user_query ? 'user' : 'assistant'),
+                content: turn.user_query || turn.agent_response || turn.content || turn.text || '',
+                timestamp: turn.timestamp || new Date(session.startTime + (index * 30000)).toISOString()
+              }));
+
+              console.log(`[TRACE] Extracted ${transcript.length} transcript entries`);
+
+              // Use ElevenLabs analysis if available
+              if (detailData.analysis) {
+                analysis = `Business English Learning Analysis (ElevenLabs)\n\nSession Duration: ${durationMinutes} minutes\n\n${JSON.stringify(detailData.analysis, null, 2)}`;
+              }
+            }
+          } else {
+            console.error('[TRACE] Failed to get conversation details:', detailResponse.status);
           }
+        } else {
+          console.log('[TRACE] No matching conversation found in the recent conversations');
         }
       } else {
-        console.log('[TRACE] Could not fetch conversations from ElevenLabs, using audio chunks for analysis');
+        console.error('[TRACE] Failed to fetch conversations:', conversationsResponse.status);
       }
     } catch (error) {
       console.error('[TRACE] Error fetching ElevenLabs conversation data:', error);
@@ -354,7 +409,7 @@ async function handleEnd(sessionId: string, apiKey: string) {
       const conversationText = transcript.map((t: any) => `${t.role}: ${t.content}`).join('\n');
       
       try {
-        // Generate analysis using the actual conversation
+        // Generate enhanced analysis using the actual conversation
         const analysisPrompt = `Analyze this business English conversation for learning insights:
 
 Duration: ${durationMinutes} minutes
@@ -363,7 +418,12 @@ Turns: ${transcript.length}
 Conversation:
 ${conversationText}
 
-Provide analysis of vocabulary used, grammar patterns, and business communication skills demonstrated.`;
+Provide detailed analysis including:
+1. Vocabulary level and business terms used
+2. Grammar patterns and complexity
+3. Communication skills demonstrated
+4. Areas for improvement
+5. Strengths in the conversation`;
 
         const analysisResponse = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -374,7 +434,7 @@ Provide analysis of vocabulary used, grammar patterns, and business communicatio
           },
           body: JSON.stringify({
             model: 'claude-3-5-sonnet-20241022',
-            max_tokens: 1000,
+            max_tokens: 1500,
             messages: [{
               role: 'user',
               content: analysisPrompt
@@ -393,15 +453,21 @@ Provide analysis of vocabulary used, grammar patterns, and business communicatio
 
       // Generate flashcards from actual conversation
       try {
-        const flashcardPrompt = `Based on this real business English conversation, create 5-8 flashcards for key terms and phrases used:
+        const flashcardPrompt = `Based on this real business English conversation, create 5-8 flashcards for key terms, phrases, and learning points:
 
 ${conversationText}
 
+Focus on:
+- Important business vocabulary used
+- Grammar structures that appeared
+- Phrases that could be learned better
+- Common expressions in business context
+
 Return JSON array with this exact structure:
 [{
-  "term": "actual term from conversation",
+  "term": "actual term/phrase from conversation",
   "definition": "clear definition",
-  "example_sentence": "sentence from the conversation or similar",
+  "example_sentence": "sentence from the conversation or similar context",
   "german_translation": "German translation",
   "common_mistake": "common error when using this term",
   "correction": "how to use correctly",
@@ -418,7 +484,7 @@ Return JSON array with this exact structure:
           },
           body: JSON.stringify({
             model: 'claude-3-5-sonnet-20241022',
-            max_tokens: 2000,
+            max_tokens: 2500,
             messages: [{
               role: 'user',
               content: flashcardPrompt
@@ -437,30 +503,34 @@ Return JSON array with this exact structure:
             }
           } catch (e) {
             console.error('[TRACE] Failed to parse flashcards JSON:', e);
+            flashcards = [];
           }
         }
       } catch (error) {
         console.error('[TRACE] Failed to generate flashcards:', error);
       }
     } else {
-      // Fallback: Generate analysis based on session duration and audio chunks
-      const audioChunksReceived = session.audioChunks?.length || 0;
+      console.log('[TRACE] No transcript found, using fallback data');
       analysis = `Business English Learning Analysis
 
 Session Duration: ${durationMinutes} minutes
-Audio chunks processed: ${audioChunksReceived}
 
-This session used ElevenLabs conversational AI for real-time practice. ${audioChunksReceived > 0 ? 'Audio data was captured and processed for learning analytics.' : 'Session completed successfully.'}
+This session used ElevenLabs conversational AI for real-time practice. The conversation was completed but transcript data is not yet available from ElevenLabs API.
+
+This may happen when:
+• The conversation was very short
+• ElevenLabs is still processing the conversation
+• There were technical issues during the session
 
 Recommendations:
-• Continue practicing with the ElevenLabs AI agent
-• Focus on speaking clearly and naturally
-• Use business-appropriate vocabulary and phrases
+• Try having longer conversations (3+ minutes)
+• Speak clearly and wait for responses
+• Ensure good microphone quality
 • Practice regularly for best results`;
 
       transcript = [{
         role: 'assistant',
-        content: 'Real-time conversation completed with ElevenLabs AI agent.',
+        content: 'Conversation completed with ElevenLabs AI agent. Transcript processing in progress.',
         timestamp: new Date().toISOString()
       }];
     }
