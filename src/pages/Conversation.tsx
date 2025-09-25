@@ -326,6 +326,10 @@ const Conversation = () => {
   };
 
   const formatPersona = (personaId: string) => {
+    // Handle special cases that should be all caps
+    if (personaId.toLowerCase() === "ceo") return "CEO";
+    if (personaId.toLowerCase() === "hr-manager") return "HR Manager";
+    
     return personaId.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
   };
 
