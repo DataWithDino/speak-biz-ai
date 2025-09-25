@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User, BookOpen, LogOut, MessageSquare, Menu, Activity, Calendar, Clock } from "lucide-react";
+import { User, BookOpen, LogOut, MessageSquare, Menu, Activity, Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ConversationSetup from "@/components/ConversationSetup";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -273,20 +273,107 @@ const Dashboard = () => {
                           
                           {/* Pagination */}
                           {recentConversations.length > conversationsPerPage && (
-                            <div className="flex justify-center gap-1 pt-4">
-                              {Array.from({ length: Math.ceil(recentConversations.length / conversationsPerPage) }, (_, i) => (
-                                <button
-                                  key={i + 1}
-                                  onClick={() => setCurrentPage(i + 1)}
-                                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                                    currentPage === i + 1
-                                      ? "bg-primary text-primary-foreground"
-                                      : "bg-secondary/20 hover:bg-secondary/30 text-foreground"
-                                  }`}
-                                >
-                                  {i + 1}
-                                </button>
-                              ))}
+                            <div className="flex justify-center items-center gap-1 pt-4">
+                              {/* Previous arrow */}
+                              <button
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className={`p-1.5 rounded-md transition-colors ${
+                                  currentPage === 1
+                                    ? "text-muted-foreground/50 cursor-not-allowed"
+                                    : "text-foreground hover:bg-secondary/30"
+                                }`}
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                              </button>
+
+                              {/* Page numbers with smart display */}
+                              {(() => {
+                                const totalPages = Math.ceil(recentConversations.length / conversationsPerPage);
+                                const pages = [];
+                                
+                                // Always show first page
+                                pages.push(
+                                  <button
+                                    key={1}
+                                    onClick={() => setCurrentPage(1)}
+                                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                                      currentPage === 1
+                                        ? "bg-primary text-primary-foreground"
+                                        : "bg-secondary/20 hover:bg-secondary/30 text-foreground"
+                                    }`}
+                                  >
+                                    1
+                                  </button>
+                                );
+
+                                // Show ellipsis if needed
+                                if (currentPage > 3) {
+                                  pages.push(
+                                    <span key="ellipsis1" className="px-2 text-muted-foreground">
+                                      ...
+                                    </span>
+                                  );
+                                }
+
+                                // Show current page and surrounding pages
+                                for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                                  pages.push(
+                                    <button
+                                      key={i}
+                                      onClick={() => setCurrentPage(i)}
+                                      className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                                        currentPage === i
+                                          ? "bg-primary text-primary-foreground"
+                                          : "bg-secondary/20 hover:bg-secondary/30 text-foreground"
+                                      }`}
+                                    >
+                                      {i}
+                                    </button>
+                                  );
+                                }
+
+                                // Show ellipsis if needed
+                                if (currentPage < totalPages - 2) {
+                                  pages.push(
+                                    <span key="ellipsis2" className="px-2 text-muted-foreground">
+                                      ...
+                                    </span>
+                                  );
+                                }
+
+                                // Always show last page if there's more than one page
+                                if (totalPages > 1) {
+                                  pages.push(
+                                    <button
+                                      key={totalPages}
+                                      onClick={() => setCurrentPage(totalPages)}
+                                      className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                                        currentPage === totalPages
+                                          ? "bg-primary text-primary-foreground"
+                                          : "bg-secondary/20 hover:bg-secondary/30 text-foreground"
+                                      }`}
+                                    >
+                                      {totalPages}
+                                    </button>
+                                  );
+                                }
+
+                                return pages;
+                              })()}
+
+                              {/* Next arrow */}
+                              <button
+                                onClick={() => setCurrentPage(prev => Math.min(Math.ceil(recentConversations.length / conversationsPerPage), prev + 1))}
+                                disabled={currentPage === Math.ceil(recentConversations.length / conversationsPerPage)}
+                                className={`p-1.5 rounded-md transition-colors ${
+                                  currentPage === Math.ceil(recentConversations.length / conversationsPerPage)
+                                    ? "text-muted-foreground/50 cursor-not-allowed"
+                                    : "text-foreground hover:bg-secondary/30"
+                                }`}
+                              >
+                                <ChevronRight className="h-4 w-4" />
+                              </button>
                             </div>
                           )}
                         </div>
