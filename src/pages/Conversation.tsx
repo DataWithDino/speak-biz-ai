@@ -261,17 +261,14 @@ const Conversation = () => {
 
       if (error) throw error;
 
-      // Navigate to study view if we have flashcards data
+      // Always navigate to study view after saving conversation
       if (studyData && studyData.flashcards && studyData.flashcards.length > 0) {
         // Store study data in sessionStorage for the StudyView
         sessionStorage.setItem('studyData', JSON.stringify(studyData));
         navigate('/study');
       } else {
-        toast({
-          title: "Conversation saved",
-          description: "Your conversation has been saved successfully"
-        });
-        navigate("/dashboard");
+        // Even without flashcards, navigate to study page - it will show mock data
+        navigate('/study');
       }
     } catch (error) {
       console.error("Error ending conversation:", error);
