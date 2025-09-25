@@ -431,12 +431,14 @@ const Conversation = () => {
               <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur px-3 py-1 rounded-md">
                 <span className="text-sm font-medium">{formatPersona(persona)}</span>
               </div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <Video className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Video simulation mode</p>
-                </div>
-              </div>
+              <iframe 
+                src="https://bey.chat/6fe011e3-9ca5-4ed2-ae33-eae6e72e5db4"
+                className="w-full h-full rounded-lg"
+                frameBorder="0"
+                allowFullScreen
+                allow="camera; microphone; fullscreen"
+                style={{ border: 'none', minHeight: '400px' }}
+              />
             </div>
           </div>
         </div>
