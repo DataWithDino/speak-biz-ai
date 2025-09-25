@@ -35,7 +35,7 @@ const Conversation = () => {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
-  const [interactionMode, setInteractionMode] = useState<InteractionMode>("audio");
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>("video");
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
