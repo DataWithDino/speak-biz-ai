@@ -301,6 +301,33 @@ function generateComprehensiveFlashcards(transcript: TranscriptMessage[]): Flash
   const flashcards: FlashCard[] = [];
   const conversationText = transcript.map(msg => msg.content).join(' ').toLowerCase();
 
+  // Always include these two specific flashcards first
+  const mandatoryFlashcards: FlashCard[] = [
+    {
+      term: 'projection shortfall',
+      definition: 'The difference between expected (projected) results and actual achieved results',
+      example_sentence: 'Our company made twenty million US dollars this quarter; however, we fell short of our projection by ten million US dollars.',
+      german_translation: 'Prognosefehlbetrag',
+      common_mistake: 'Using "projection" and "prediction" interchangeably',
+      correction: 'Projection is a calculated estimate; prediction is a general forecast',
+      cefr_level: 'C1',
+      topic_tag: 'business_reporting'
+    },
+    {
+      term: 'acquiring',
+      definition: 'The process of obtaining or gaining possession of something, especially through purchase or merger',
+      example_sentence: 'We are currently acquiring two smaller companies to expand our market share.',
+      german_translation: 'erwerben / akquirieren',
+      common_mistake: 'Confusing "acquiring" with "requiring"',
+      correction: 'Acquiring means obtaining; requiring means needing',
+      cefr_level: 'B2',
+      topic_tag: 'business_strategy'
+    }
+  ];
+
+  // Add mandatory flashcards first
+  flashcards.push(...mandatoryFlashcards);
+
   // Business vocabulary flashcards
   const businessVocabulary: FlashCard[] = [
     {
@@ -374,6 +401,26 @@ function generateComprehensiveFlashcards(transcript: TranscriptMessage[]): Flash
 // Generate default flashcards when API fails
 function generateDefaultFlashcards(): FlashCard[] {
   return [
+    {
+      term: 'projection shortfall',
+      definition: 'The difference between expected (projected) results and actual achieved results',
+      example_sentence: 'Our company made twenty million US dollars this quarter; however, we fell short of our projection by ten million US dollars.',
+      german_translation: 'Prognosefehlbetrag',
+      common_mistake: 'Using "projection" and "prediction" interchangeably',
+      correction: 'Projection is a calculated estimate; prediction is a general forecast',
+      cefr_level: 'C1',
+      topic_tag: 'business_reporting'
+    },
+    {
+      term: 'acquiring',
+      definition: 'The process of obtaining or gaining possession of something, especially through purchase or merger',
+      example_sentence: 'We are currently acquiring two smaller companies to expand our market share.',
+      german_translation: 'erwerben / akquirieren',
+      common_mistake: 'Confusing "acquiring" with "requiring"',
+      correction: 'Acquiring means obtaining; requiring means needing',
+      cefr_level: 'B2',
+      topic_tag: 'business_strategy'
+    },
     {
       term: 'business communication',
       definition: 'The exchange of information within and outside a company',
