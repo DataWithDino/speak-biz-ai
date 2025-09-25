@@ -135,8 +135,8 @@ const StudyView = () => {
   const playAudio = async (text: string, type: 'term' | 'example', index: number) => {
     const audioKey = `${index}-${type}`;
     
+    // Check if audio is already cached
     if (audioUrls[audioKey]) {
-      // Audio already generated, play it
       const audio = new Audio(audioUrls[audioKey]);
       audio.play();
       return;
@@ -145,25 +145,31 @@ const StudyView = () => {
     setAudioLoading(prev => ({ ...prev, [audioKey]: true }));
     
     try {
-      const response = await elevenlabsClient.generateTTS(text, "1"); // Using voice ID 1 as specified
+      // Use Roger voice (professional male voice) for business English
+      const voiceId = "CwhRBWXzGAHq8TQ4Fs17"; // Roger - clear professional voice
+      const audioUrl = await elevenlabsClient.generateTTS(text, voiceId);
       
-      // Convert base64 to blob URL
-      const audioBlob = new Blob([
-        Uint8Array.from(atob(response), c => c.charCodeAt(0))
-      ], { type: 'audio/mpeg' });
-      
-      const audioUrl = URL.createObjectURL(audioBlob);
+      // Store the URL for future playback
       setAudioUrls(prev => ({ ...prev, [audioKey]: audioUrl }));
       
+      // Play the audio
       const audio = new Audio(audioUrl);
-      audio.play();
+      await audio.play();
     } catch (error) {
       console.error('Failed to generate TTS:', error);
       toast({
-        title: "Audio Error",
-        description: "Failed to generate audio. Please try again.",
-        variant: "destructive",
+        title: "Audio Playback",
+        description: "Using fallback pronunciation. Check your ElevenLabs API key.",
+        variant: "default",
       });
+      
+      // Fallback to browser's built-in speech synthesis
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.9;
+        speechSynthesis.speak(utterance);
+      }
     } finally {
       setAudioLoading(prev => ({ ...prev, [audioKey]: false }));
     }

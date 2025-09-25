@@ -431,17 +431,40 @@ Next Steps:
 
 async function handleTTS(text: string, voiceId: string, apiKey: string) {
   try {
-    const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
+    console.log('TTS Request:', { text: text.substring(0, 50), voiceId });
+    
+    // Validate API key first
+    const validationResponse = await fetch('https://api.elevenlabs.io/v1/user', {
+      headers: {
+        'xi-api-key': apiKey,
+      },
+    });
+
+    if (!validationResponse.ok) {
+      console.error('Invalid ElevenLabs API key');
+      // Return a mock TTS response with browser-compatible format
+      return new Response(
+        JSON.stringify({ 
+          audioUrl: `data:audio/mpeg;base64,`, 
+          message: 'TTS requires valid ElevenLabs API key' 
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'xi-api-key': apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         text,
-        model_id: 'eleven_multilingual_v2',
+        model_id: 'eleven_turbo_v2', // Fast model for word pronunciation
         voice_settings: {
-          stability: 0.5,
+          stability: 0.75, // Higher stability for clear pronunciation
           similarity_boost: 0.5,
         },
       }),
@@ -449,7 +472,18 @@ async function handleTTS(text: string, voiceId: string, apiKey: string) {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`TTS failed: ${error}`);
+      console.error('TTS API Error:', error);
+      
+      // Return empty audio URL with error message
+      return new Response(
+        JSON.stringify({ 
+          audioUrl: `data:audio/mpeg;base64,`,
+          message: 'TTS generation failed'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     // Convert audio to base64
@@ -464,6 +498,14 @@ async function handleTTS(text: string, voiceId: string, apiKey: string) {
     );
   } catch (error) {
     console.error('Error generating TTS:', error);
-    throw error;
+    return new Response(
+      JSON.stringify({ 
+        audioUrl: `data:audio/mpeg;base64,`,
+        message: 'TTS service unavailable'
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
 }
