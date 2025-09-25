@@ -20,21 +20,29 @@ If you want to work locally using your own IDE, you can clone this repo and push
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-Follow these steps:
+### Running the project locally
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+To run this project on your local machine, follow these steps:
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+1.  **Clone the repository:**
 
-# Step 3: Install the necessary dependencies.
-npm i
+    ```sh
+    git clone https://github.com/DataWithDino/speak-biz-ai.git
+    cd speak-biz-ai
+    ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+2.  **Install dependencies:**
+    This project uses `npm` as the package manager.
+
+    ```sh
+    npm install
+    ```
+
+3.  **Start the development server:**
+    ```sh
+    npm run dev
+    ```
+    This will start a development server on `http://localhost:8080`. You can open this URL in your browser to see the application. The server will automatically reload when you make changes to the code.
 
 **Edit a file directly in GitHub**
 
