@@ -99,18 +99,26 @@ const Conversation = () => {
 
   const startBackgroundRecording = async () => {
     try {
-      // Start ElevenLabs session first
-      const sessionId = await elevenlabsClient.startSession(
-        "agent_2901k609n6fremxtqcaxw45412t1", // From the requirements
-        "1" // Voice ID from requirements
-      );
-      setElevenlabsSessionId(sessionId);
+      // Start ElevenLabs session using our edge function
+      const { data, error } = await supabase.functions.invoke('elevenlabs-agent', {
+        body: { 
+          action: 'start',
+          agentId: "agent_2901k609n6fremxtqcaxw45412t1",
+          voiceId: "1"
+        }
+      });
+
+      if (error || !data?.sessionId) {
+        throw new Error(error?.message || 'Failed to start ElevenLabs session');
+      }
+
+      setElevenlabsSessionId(data.sessionId);
 
       // Start transcript recording
       await transcriptRecorder.startRecording();
       setBackgroundRecordingActive(true);
 
-      console.log("Background recording started with ElevenLabs session:", sessionId);
+      console.log("Background recording started with ElevenLabs session:", data.sessionId);
     } catch (error) {
       console.error("Failed to start background recording:", error);
       toast({
@@ -223,7 +231,28 @@ const Conversation = () => {
       // Stop background recording and get analysis
       let studyData = null;
       if (elevenlabsSessionId && recordingEnabled) {
-        studyData = await stopBackgroundRecording();
+        // Call our edge function to end the ElevenLabs session and get transcript
+        try {
+          const { data, error } = await supabase.functions.invoke('elevenlabs-agent', {
+            body: { 
+              action: 'end',
+              sessionId: elevenlabsSessionId
+            }
+          });
+          
+          if (error) {
+            console.error('Failed to end ElevenLabs session:', error);
+          } else {
+            studyData = data;
+            console.log('ElevenLabs session ended with data:', studyData);
+          }
+        } catch (error) {
+          console.error('Error calling end session:', error);
+        }
+        
+        setElevenlabsSessionId(null);
+        transcriptRecorder.stopRecording();
+        setBackgroundRecordingActive(false);
       }
 
       // Stop video call if active
@@ -237,7 +266,7 @@ const Conversation = () => {
       };
 
       // Include transcript and analysis if available from ElevenLabs
-      if (studyData) {
+      if (studyData && studyData.transcript) {
         updateData.transcript = studyData.transcript;
         if (studyData.flashcards) {
           updateData.flashcards = studyData.flashcards;
@@ -267,7 +296,7 @@ const Conversation = () => {
         sessionStorage.setItem('studyData', JSON.stringify(studyData));
         navigate('/study');
       } else {
-        // Even without flashcards, navigate to study page - it will show mock data
+        // Even without flashcards, navigate to study page - it will show analysis
         navigate('/study');
       }
     } catch (error) {

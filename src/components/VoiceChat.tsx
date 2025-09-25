@@ -41,8 +41,8 @@ Your role:
 
 Remember to match the learner's level - don't use language that's too advanced or too simple for ${skillLevel}.`;
 
-  // ElevenLabs agent ID for conversation
-  const AGENT_ID = "agent_4301k5ysabajfbcsns6zmc0qfbe4";
+  // ElevenLabs agent ID for conversation - using the user's agent ID
+  const AGENT_ID = "agent_2901k609n6fremxtqcaxw45412t1";
 
   const conversation = useConversation({
     overrides: {
@@ -118,10 +118,14 @@ Remember to match the learner's level - don't use language that's too advanced o
         console.log('Audio track:', track.label, 'enabled:', track.enabled);
       });
 
-      // Get signed URL from our edge function
-      console.log('Fetching signed URL from edge function...');
+      // Get signed URL from our edge function using the new action-based approach
+      console.log('Starting ElevenLabs session...');
       const { data, error } = await supabase.functions.invoke('elevenlabs-agent', {
-        body: { topic, persona, skillLevel }
+        body: { 
+          action: 'start',
+          agentId: AGENT_ID,
+          voiceId: "9BWtsMINqrJLrRacOk9x" // Aria voice
+        }
       });
 
       if (error || !data?.signedUrl) {
@@ -136,7 +140,7 @@ Remember to match the learner's level - don't use language that's too advanced o
       });
       
       console.log('ElevenLabs session started with ID:', sessionId);
-      sessionIdRef.current = sessionId;
+      sessionIdRef.current = data.sessionId; // Store our tracking session ID
       setIsConnecting(false);
       
       // Keep the microphone stream active
