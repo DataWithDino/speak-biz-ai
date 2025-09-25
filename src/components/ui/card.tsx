@@ -13,7 +13,7 @@ const Card = React.forwardRef<
     animate={{ opacity: 1, y: 0 }}
     whileHover={{
       boxShadow: "0 4px 24px hsl(183 100% 45% / 0.12)",
-      borderColor: "hsl(183, 100%, 45%)"
+      borderColor: "hsl(183, 100%, 45%)",
     }}
     transition={{ duration: 0.4, type: "spring", stiffness: 120 }}
     className={cn(
