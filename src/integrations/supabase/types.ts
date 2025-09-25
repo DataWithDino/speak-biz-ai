@@ -17,8 +17,10 @@ export type Database = {
       conversations: {
         Row: {
           ai_persona: string
+          analysis: string | null
           created_at: string
           ended_at: string | null
+          flashcards: Json | null
           id: string
           skill_level: Database["public"]["Enums"]["skill_level"]
           started_at: string
@@ -28,8 +30,10 @@ export type Database = {
         }
         Insert: {
           ai_persona: string
+          analysis?: string | null
           created_at?: string
           ended_at?: string | null
+          flashcards?: Json | null
           id?: string
           skill_level: Database["public"]["Enums"]["skill_level"]
           started_at?: string
@@ -39,8 +43,10 @@ export type Database = {
         }
         Update: {
           ai_persona?: string
+          analysis?: string | null
           created_at?: string
           ended_at?: string | null
+          flashcards?: Json | null
           id?: string
           skill_level?: Database["public"]["Enums"]["skill_level"]
           started_at?: string
