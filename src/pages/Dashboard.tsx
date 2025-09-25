@@ -42,6 +42,8 @@ const Dashboard = () => {
   const [showSetup, setShowSetup] = useState(false);
   const [recentConversations, setRecentConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const conversationsPerPage = 3;
 
   useEffect(() => {
     fetchProfile();
@@ -57,8 +59,7 @@ const Dashboard = () => {
         .from("conversations")
         .select("*")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(5);
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error fetching conversations:", error);
@@ -242,30 +243,52 @@ const Dashboard = () => {
                         </p>
                       ) : (
                         <div className="space-y-3">
-                          {recentConversations.map((conversation) => (
-                            <div
-                              key={conversation.id}
-                              className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
-                              onClick={() => setSelectedConversation(conversation)}
-                            >
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                                  <p className="font-medium text-sm">{conversation.topic}</p>
+                          {/* Display only conversations for current page */}
+                          {recentConversations
+                            .slice((currentPage - 1) * conversationsPerPage, currentPage * conversationsPerPage)
+                            .map((conversation) => (
+                              <div
+                                key={conversation.id}
+                                className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+                                onClick={() => setSelectedConversation(conversation)}
+                              >
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                                    <p className="font-medium text-sm">{conversation.topic}</p>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <User className="h-3 w-3" />
+                                    <span>{conversation.ai_persona}</span>
+                                    <span>•</span>
+                                    <Calendar className="h-3 w-3" />
+                                    <span>{format(new Date(conversation.created_at), "MMM d, yyyy")}</span>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <User className="h-3 w-3" />
-                                  <span>{conversation.ai_persona}</span>
-                                  <span>•</span>
-                                  <Calendar className="h-3 w-3" />
-                                  <span>{format(new Date(conversation.created_at), "MMM d, yyyy")}</span>
-                                </div>
+                                <Badge variant="outline" className="text-xs">
+                                  {conversation.skill_level}
+                                </Badge>
                               </div>
-                              <Badge variant="outline" className="text-xs">
-                                {conversation.skill_level}
-                              </Badge>
+                            ))}
+                          
+                          {/* Pagination */}
+                          {recentConversations.length > conversationsPerPage && (
+                            <div className="flex justify-center gap-1 pt-4">
+                              {Array.from({ length: Math.ceil(recentConversations.length / conversationsPerPage) }, (_, i) => (
+                                <button
+                                  key={i + 1}
+                                  onClick={() => setCurrentPage(i + 1)}
+                                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                                    currentPage === i + 1
+                                      ? "bg-primary text-primary-foreground"
+                                      : "bg-secondary/20 hover:bg-secondary/30 text-foreground"
+                                  }`}
+                                >
+                                  {i + 1}
+                                </button>
+                              ))}
                             </div>
-                          ))}
+                          )}
                         </div>
                       )}
                     </CardContent>
