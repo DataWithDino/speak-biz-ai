@@ -420,17 +420,8 @@ const Conversation = () => {
               )}
             </div>
             
-            {/* Remote Video Placeholder */}
+            {/* AI Agent Video */}
             <div className="flex-1 relative bg-muted rounded-lg overflow-hidden">
-              <video
-                ref={remoteVideoRef}
-                autoPlay
-                playsInline
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur px-3 py-1 rounded-md">
-                <span className="text-sm font-medium">{formatPersona(persona)}</span>
-              </div>
               <iframe 
                 src="https://bey.chat/6fe011e3-9ca5-4ed2-ae33-eae6e72e5db4"
                 className="w-full h-full rounded-lg"
@@ -438,7 +429,11 @@ const Conversation = () => {
                 allowFullScreen
                 allow="camera; microphone; fullscreen"
                 style={{ border: 'none', minHeight: '400px' }}
+                title="AI Conversational Agent"
               />
+              <div className="absolute bottom-4 left-4 bg-background/80 backdrop-blur px-3 py-1 rounded-md">
+                <span className="text-sm font-medium">{formatPersona(persona)} AI Agent</span>
+              </div>
             </div>
           </div>
         </div>
